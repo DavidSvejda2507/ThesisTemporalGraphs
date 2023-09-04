@@ -21,7 +21,7 @@ def calculateAccuracy(partition, reference, k=None):
     if k is None:
         if k_in != k_out:
             warnings.warn(
-                Warning(
+                UserWarning(
                     f"Partitions have different number of communities:\nPartition has {k_in} communities\nReference has {k_out} communities"
                 )
             )
@@ -38,7 +38,7 @@ def calculateAccuracy(partition, reference, k=None):
     while i > 0:
         key, value = np.unravel_index(contingencyTable.argmax(), (k_in, k_out))
         if (key not in inputs) or (value not in outputs):
-            warnings.warn(Warning("Accuracy mapping is nontrivial"))
+            warnings.warn(UserWarning("Accuracy mapping is nontrivial"))
         else:
             mapping[key] = value
             inputs.remove(key)
