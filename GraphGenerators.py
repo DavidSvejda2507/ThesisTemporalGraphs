@@ -2,10 +2,10 @@ import igraph as ig
 import numpy as np
 
 
-def GirvanNewmanBenchmark(k_out, offset=0):
+def GirvanNewmanBenchmark(k_out, offset=0, density=1):
     k_in = 16 - k_out
-    p_in = k_in / 31
-    p_out = k_out / 96
+    p_in = density * k_in / 31
+    p_out = density * k_out / 96
     pref_matrix = [
         [p_in, p_out, p_out, p_out, p_in],
         [p_out, p_in, p_out, p_out, p_out],
@@ -13,6 +13,7 @@ def GirvanNewmanBenchmark(k_out, offset=0):
         [p_out, p_out, p_out, p_in, p_out],
         [p_in, p_out, p_out, p_out, p_in],
     ]
+    n_turns = offset // 32
     offset = offset % 32
 
     G = ig.Graph.SBM(
@@ -22,10 +23,8 @@ def GirvanNewmanBenchmark(k_out, offset=0):
         directed=False,
         loops=False,
     )
-
-    G.vs["community"] = (
-        [0] * offset + [1] * 32 + [2] * 32 + [3] * 32 + [0] * (32 - offset)
-    )
+    communities = [0] * offset + [1] * 32 + [2] * 32 + [3] * 32 + [0] * (32 - offset)
+    G.vs["community"] = [(community + n_turns) % 4 for community in communities]
     return G
 
 
@@ -40,19 +39,21 @@ def addWeights(w1, w2):
 
 
 def mergeGraphs(Graph1, Graph2):
-    if not Graph1.is_weighted():
-        Graph1.es["weight_1"] = 1
-    else:
+    if Graph1.is_weighted():
         Graph1.es["weight_1"] = Graph1.es["weight"]
-    del Graph1.es["weight_2"]
-    del Graph1.es["weight"]
-
-    if not Graph2.is_weighted():
-        Graph2.es["weight_2"] = 1
+        del Graph1.es["weight"]
     else:
+        Graph1.es["weight_1"] = 1
+    if "weight_2" in Graph1.es.attributes():
+        del Graph1.es["weight_2"]
+
+    if Graph2.is_weighted():
         Graph2.es["weight_2"] = Graph2.es["weight"]
-    del Graph2.es["weight_1"]
-    del Graph2.es["weight"]
+        del Graph2.es["weight"]
+    else:
+        Graph2.es["weight_2"] = 1
+    if "weight_1" in Graph2.es.attributes():
+        del Graph2.es["weight_1"]
 
     # print(Graph1.es.attributes())
     # print(Graph1.vs.attributes())
@@ -68,6 +69,33 @@ def mergeGraphs(Graph1, Graph2):
         for weight_1, weight_2 in zip(G.es["weight_1"], G.es["weight_2"])
     ]
     # print(G.es["weight"])
+    return G
+
+
+def concatGraphs(graphs, weight):
+    """Takes a list of graphs which all have the same vertices
+    and combines them into one graph
+    with all of the same vertices of consecutive graphs connected by edges
+    with the specified weight
+
+    Args:
+        graphs (list of iGraph): Graphs to be connected
+        weight (double): Weight of the connecting graphs
+    """
+    n = graphs[0].vcount()
+    n_graphs = len(graphs)
+    for index, graph in enumerate(graphs):
+        if not graph.is_weighted():
+            graph.es["weight"] = 1
+        if graph.vcount() != n:
+            raise ValueError(
+                f"Not all graphs have the same number of vertices:\nGraph 0 has {n} vertices\nGraph {index} has {graph.vcount()} vertices"
+            )
+
+    G = ig.operators.disjoint_union(graphs)
+    edges = [(x, x + n) for x in range(n * (n_graphs - 1))]
+    weights = [weight] * (n * (n_graphs - 1))
+    G.add_edges(edges, {"weight": weights})
     return G
 
 

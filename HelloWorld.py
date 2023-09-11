@@ -10,8 +10,8 @@ ig.config["plotting.backend"] = "matplotlib"
 
 # G = ig.Graph.GRG(100, 0.2)
 for i in range(1):
-    G1 = grGen.GirvanNewmanBenchmark(6, 2 * i)
-    G2 = grGen.GirvanNewmanBenchmark(6, 2 * (i + 1))
+    G1 = grGen.GirvanNewmanBenchmark(8, 2 * i)
+    G2 = grGen.GirvanNewmanBenchmark(8, 2 * (i + 1))
     # print(G)
 
     shapeMap = grPlt.shapeMap()
@@ -25,16 +25,28 @@ for i in range(1):
         grGen.mergeGraphs(G1, G2), leidenalg.ModularityVertexPartition
     )
     print(
-        f"Accuracy on G1: {grAn.calculateAccuracy(part1.membership, G1.vs['community'])[0]}"
+        f"Consistency1 on G1: {grAn.Consistency(part1.membership, G1.vs['community'])}"
     )
     print(
-        f"Accuracy on G2: {grAn.calculateAccuracy(part2.membership, G2.vs['community'])[0]}"
+        f"Consistency2 on G1: {grAn.ConsistencyCheck(part1.membership, G1.vs['community'])}"
     )
     print(
-        f"Accuracy of union on G1: {grAn.calculateAccuracy(part.membership, G1.vs['community'])[0]}"
+        f"Consistency1 on G2: {grAn.Consistency(part2.membership, G2.vs['community'])}"
     )
     print(
-        f"Accuracy of union on G1: {grAn.calculateAccuracy(part.membership, G2.vs['community'])[0]}"
+        f"Consistency2 on G2: {grAn.ConsistencyCheck(part2.membership, G2.vs['community'])}"
+    )
+    print(
+        f"Consistency1 of union on G1: {grAn.Consistency(part.membership, G1.vs['community'])}"
+    )
+    print(
+        f"Consistency2 of union on G1: {grAn.ConsistencyCheck(part.membership, G1.vs['community'])}"
+    )
+    print(
+        f"Consistency1 of union on G2: {grAn.Consistency(part.membership, G2.vs['community'])}"
+    )
+    print(
+        f"Consistency2 of union on G2: {grAn.ConsistencyCheck(part.membership, G2.vs['community'])}"
     )
     # print(
     #     f"The modularity of the 'correct' clustering is \t{G.modularity(G.vs['community'])}"

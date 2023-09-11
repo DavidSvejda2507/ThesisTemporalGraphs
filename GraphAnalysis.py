@@ -44,7 +44,7 @@ def calculateAccuracy(partition, reference, k=None):
             inputs.remove(key)
             outputs.remove(value)
             i -= 1
-        contingencyTable[key, value] = 0
+        contingencyTable[key, value] = -1
 
     correct = 0
     for input, output in zip(partition, reference):
@@ -52,3 +52,39 @@ def calculateAccuracy(partition, reference, k=None):
             correct += 1
 
     return correct / n, mapping
+
+
+def Consistency(partition1, partition2):
+    assert len(partition1) == len(partition2)
+    vs = len(partition1)
+    k1 = max(partition1) + 1
+    k2 = max(partition2) + 1
+    contingencyTable = np.zeros((k1, k2))
+    for comm, comm_ in zip(partition1, partition2):
+        contingencyTable[comm, comm_] += 1
+
+    sum = 0
+    for row in contingencyTable:
+        rowsum = 0
+        for n in row:
+            sum += rowsum * n
+            rowsum += n
+    for col in contingencyTable.transpose():
+        colsum = 0
+        for n in col:
+            sum += colsum * n
+            colsum += n
+    return 1 - 2 * sum / (vs * (vs - 1))
+
+
+def ConsistencyCheck(partition1, partition2):
+    assert len(partition1) == len(partition2)
+    vs = len(partition1)
+    sum = 0
+    for i in range(vs):
+        for j in range(i + 1, vs):
+            if partition1[i] == partition1[j] and partition2[i] != partition2[j]:
+                sum += 1
+            if partition1[i] != partition1[j] and partition2[i] == partition2[j]:
+                sum += 1
+    return 1 - 2 * sum / (vs * (vs - 1))
