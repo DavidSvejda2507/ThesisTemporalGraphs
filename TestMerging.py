@@ -10,10 +10,6 @@ import warnings
 warnings.simplefilter("ignore", UserWarning)
 
 
-def calcDifference(partition, previous):
-    return 1 - grAn.calculateAccuracy(partition, previous)[0]
-
-
 def generateGraphSequence(n_steps, step_size, generator, **kwargs):
     graphs = [None] * n_steps
     for i in range(n_steps):
@@ -87,8 +83,8 @@ def ClusterTest(GenerationPars, clusterers, title, filename):
         "ro",
         label="'True' community structure",
     )
-    ax.set_ylim(bottom=0)
-    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.1)
+    ax.set_xlim(left=0, right=ax.get_xlim()[1] * 1.1)
     ax.set_ylabel("Average modularity")
     ax.set_xlabel("Average consistency")
     ax.legend()
@@ -108,11 +104,16 @@ step_size = 32 * n_turns // n_steps
 GenerationPars = {
     "n_steps": n_steps,
     "step_size": step_size,
-    "generator": grGen.TestCreationDestruction,
+    "generator": grGen.GirvanNewmanBenchmark,
     "k_out": k_out,
     "density": 0.5,
 }
 clusterers = [
+    {
+        "method": grCls.clusterVariance,
+        "ks": [1, 2, 3, 4, 5, 6, 7, 8],
+        "label": "Variance of optimal solutions",
+    },
     {
         "method": grCls.clusterStacked,
         "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
@@ -144,6 +145,7 @@ clusterers = [
 ]
 
 title = "Girvan and Newman benchmark with two turns in 16 steps"
-filename = "plotCreationDestructionBenchmark.pdf"
+filename = "plotGNbenchmark.pdf"
+# filename = "plotCreationDestructionBenchmark.pdf"
 
 ClusterTest(GenerationPars, clusterers, title, filename)
