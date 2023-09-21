@@ -109,16 +109,21 @@ GenerationPars = {
     "density": 0.5,
 }
 clusterers = [
-    {
-        "method": grCls.clusterVariance,
-        "ks": [1, 2, 3, 4, 5, 6, 7, 8],
-        "label": "Variance of optimal solutions",
-    },
-    {
-        "method": grCls.clusterStacked,
-        "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
-        "label": "Merge-partition",
-    },
+    # {
+    #     "method": grCls.clusterVariance,
+    #     "ks": [1, 2, 3, 4, 5, 6, 7, 8],
+    #     "label": "Variance of optimal solutions",
+    # },
+    # {
+    #     "method": grCls.clusterVariance2,
+    #     "ks": [1, 2, 3, 4, 5],
+    #     "label": "Variance of optimal solutions with depth 2",
+    # },
+    # {
+    #     "method": grCls.clusterStacked,
+    #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
+    #     "label": "Merge-partition",
+    # },
     {
         "method": grCls.clusterConnected,
         "ks": [
@@ -145,7 +150,8 @@ clusterers = [
 ]
 
 title = "Girvan and Newman benchmark with two turns in 16 steps"
-filename = "plotGNbenchmark.pdf"
+# filename = "plotGNbenchmark.pdf"
 # filename = "plotCreationDestructionBenchmark.pdf"
+filename = "test.pdf"
 
 ClusterTest(GenerationPars, clusterers, title, filename)

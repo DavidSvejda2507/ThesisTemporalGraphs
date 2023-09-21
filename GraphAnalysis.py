@@ -1,6 +1,7 @@
 import igraph as ig
 import numpy as np
 import warnings
+import numba
 
 
 def calculateAccuracy(partition, reference, k=None):
@@ -54,6 +55,7 @@ def calculateAccuracy(partition, reference, k=None):
     return correct / n, mapping
 
 
+@numba.jit(nopython=True)
 def Consistency(partition1, partition2):
     assert len(partition1) == len(partition2)
     vs = len(partition1)

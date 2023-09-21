@@ -1,5 +1,7 @@
 import igraph as ig
 import leidenalg
+import numba
+import GraphAnalysis as grAn
 
 
 def clusterStacked(graphs, k):
@@ -45,9 +47,8 @@ def clusterConnected(graphs, k):
     )[0]
 
 
+# @numba.jit(nopython=True)
 def clusterVariance(graphs, k):
-    import GraphAnalysis as grAn
-
     clusters = [[None] * k for _ in range(len(graphs))]
     for i, graph_ in enumerate(graphs):
         for j in range(k):
@@ -55,6 +56,7 @@ def clusterVariance(graphs, k):
                 graph_, leidenalg.ModularityVertexPartition, seed=j * 137
             )
             clusters[i][j] = partition.membership
+            del partition
 
     partitions = [None] * len(graphs)
     max = 0
@@ -76,5 +78,45 @@ def clusterVariance(graphs, k):
                 max_index = j
         partitions[i] = clusters[i][max_index]
         previous = max_index
+
+    return partitions
+
+
+# @numba.jit(nopython=True)
+def clusterVariance2(graphs, k):
+    clusters = [[None] * k for _ in range(len(graphs))]
+    for i, graph_ in enumerate(graphs):
+        for j in range(k):
+            partition = leidenalg.find_partition(
+                graph_, leidenalg.ModularityVertexPartition, seed=j * 137
+            )
+            clusters[i][j] = partition.membership
+            del partition
+
+    partitions = [None] * len(graphs)
+    max = 0
+    max_index = None
+    for i in range(k):
+        for j in range(k):
+            consistency = grAn.Consistency(clusters[0][i], clusters[1][j])
+            for m in range(k):
+                consistency2 = grAn.Consistency(clusters[1][j], clusters[2][m])
+                if consistency + consistency2 > max:
+                    max = consistency
+                    max_index = i
+    partitions[0] = clusters[0][max_index]
+    previous = max_index
+    for i in range(1, len(graphs) - 1):
+        max = 0
+        for j in range(k):
+            consistency = grAn.Consistency(clusters[i - 1][previous], clusters[i][j])
+            for m in range(k):
+                consistency2 = grAn.Consistency(clusters[i][j], clusters[i + 1][m])
+                if consistency + consistency2 > max:
+                    max = consistency
+                    max_index = (j, m)
+        partitions[i] = clusters[i][max_index[0]]
+        previous = max_index[0]
+    partitions[-1] = clusters[-1][max_index[1]]
 
     return partitions
