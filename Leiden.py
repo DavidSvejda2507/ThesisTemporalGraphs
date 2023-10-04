@@ -4,46 +4,59 @@ import random
 from math import exp
 from queue import SimpleQueue
 
-_comm = "_commLeiden"
-_refine = "_commLeidenRefinement"
-_queued = "_queued"
+_comm = "leiden_commLeiden"
+_refine = "leiden_commLeidenRefinement"
+_refineIndex = "leiden_refinementIndex"
+_queued = "leiden_queued"
 
 theta = 0.05
 
 
-def leiden(graph):
+def leiden(graph, attr):
     i = 0
-
     communities = initialisePartition(graph, _comm)
 
-    while i < 2:
+    while i < 10:
         j = 0
-        converged_inner = localMove(_graph, communities)
+        converged_inner = localMove(graph, communities)
 
         communities = cleanCommunities(communities)
-        refine_communities = initialisePartition(_graph, _refine)
-        refine(_graph, communities, refine_communities)
+        refine_communities = initialisePartition(graph, _refine)
+        refine(graph, communities, refine_communities)
 
-        _graph = graph
+        graphs = [graph]
 
         while j < 5 and not converged_inner:
-            converged_inner = localMove(_graph, communities)
+            _graph = aggregate(graph)
+            graphs.append(_graph)
+            graph = _graph
+
+            converged_inner = localMove(graph, communities)
 
             communities = cleanCommunities(communities)
-            refine_communities = initialisePartition(_graph, _refine)
-            refine(_graph, communities, refine_communities)
+            refine(graph, communities, refine_communities)
 
-            _graph = aggregate(_graph)
             j += 1
 
-        deAggregate(graph, _graph)
+        for graph, aggregate_graph in zip(graphs[-2::-1], graphs[:1:-1]):
+            deAggragate(graph, aggregate_graph)
+
+        graph = graphs[0]
         i += 1
 
-    return quality(graph)
+    graph.vs[attr] = graph.vs[_comm]
+    # del graph.vs[_comm]
+    del graph.vs[_refine]
+    del graph.vs[_refineIndex]
+    del graph.vs[_queued]
+
+    renumber(graph, attr)
+
+    return quality(graph, attr)
 
 
-def quality(graph):
-    return graph.modularity(graph.vs[_comm])
+def quality(graph, comm):
+    return graph.modularity(graph.vs[comm])
 
 
 def initialisePartition(graph, attribute):
@@ -69,7 +82,7 @@ def cleanCommunities(communities):
 
 
 def localMove(graph, communities):
-    queue = SimpleQueue(maxsize=graph.vcount())
+    queue = SimpleQueue()
     indices = list(range(graph.vcount()))
     random.shuffle(indices)
     for i in indices:
@@ -145,23 +158,23 @@ def localMove(graph, communities):
 def refine(graph, communities, refine_communities):
     for comm in communities:
         kwarg = {_comm + "_eq": comm}
-        indices = graph.vs.select(**kwarg)
+        indices = [v.index for v in graph.vs.select(**kwarg)]
         random.shuffle(indices)
 
         for vertex_id in indices:
             if refine_communities[graph.vs[vertex_id][_refine]][0] > 0:
                 continue
-            neighbors = graph.neighbors(vertex_id).select(**kwarg)
+            neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
             community_edges = {}
             for vertex in neighbors:
-                refine_comm = graph.vs[vertex][_refine]
+                refine_comm = vertex[_refine]
                 community_edges[refine_comm] = community_edges.get(refine_comm, 0) + 1
 
             degree = graph.degree(vertex_id)
             current_comm = graph.vs[vertex_id][_refine]
             candidates = []
             weights = []
-            cost_of_leaving = -((degree / (2 * graph.edgecount)) ** 2)
+            cost_of_leaving = -((degree / (2 * graph.ecount())) ** 2)
             for refine_comm in community_edges.keys():
                 dq = (
                     calculateDQ(
@@ -202,27 +215,25 @@ We want to compare having the vertex in the community vs having it in its own co
 
 def calculateDQ(graph, communities, comm, vertex, edges, degree):
     edgecount, degreesum = communities[comm]
-    current_q = (
-        edgecount / graph.edgecount() - (0.5 * degreesum / graph.edgecount()) ** 2
-    )
-    new_q = (edgecount + edges) / graph.edgecount() - (
-        0.5 * (degreesum + degree) / graph.edgecount()
+    current_q = edgecount / graph.ecount() - (0.5 * degreesum / graph.ecount()) ** 2
+    new_q = (edgecount + edges) / graph.ecount() - (
+        0.5 * (degreesum + degree) / graph.ecount()
     ) ** 2
 
     dq1 = (
-        (edgecount + edges) / graph.edgecount()
-        - (0.5 * (degreesum + degree) / graph.edgecount()) ** 2
-        - edgecount / graph.edgecount()
-        + (0.5 * degreesum / graph.edgecount()) ** 2
+        (edgecount + edges) / graph.ecount()
+        - (0.5 * (degreesum + degree) / graph.ecount()) ** 2
+        - edgecount / graph.ecount()
+        + (0.5 * degreesum / graph.ecount()) ** 2
     )
     dq2 = (
-        edges / graph.edgecount()
-        - ((degreesum + degree)) ** 2 / ((2 * graph.edgecount())) ** 2
-        + (degreesum) ** 2 / ((2 * graph.edgecount())) ** 2
+        edges / graph.ecount()
+        - ((degreesum + degree)) ** 2 / ((2 * graph.ecount())) ** 2
+        + (degreesum) ** 2 / ((2 * graph.ecount())) ** 2
     )
     dq = (
-        edges / graph.edgecount()
-        - ((2 * degreesum + degree) * degree) / (2 * graph.edgecount()) ** 2
+        edges / graph.ecount()
+        - ((2 * degreesum + degree) * degree) / (2 * graph.ecount()) ** 2
     )
     if abs(dq1 - new_q + current_q) > 1e-5:
         raise ValueError("difference between difference and dq1")
@@ -233,14 +244,33 @@ def calculateDQ(graph, communities, comm, vertex, edges, degree):
     return dq
 
 
+def aggregate(graph):
+    partition = ig.VertexClustering.FromAttribute(graph, _refine)
+    aggregate_graph = partition.cluster_graph("first", "sum")
+
+    _dict = {v[_refine]: v.index for v in aggregate_graph.vs}
+    graph.vs[_refineIndex] = [_dict[ref] for ref in graph.vs[_refine]]
+
+    return aggregate_graph
+
+
+def deAggragate(graph, _graph):
+    graph.vs[_comm] = [_graph.vs[index][_comm] for index in graph.vs[_refineIndex]]
+
+
+def renumber(graph, comm):
+    _dict = {}
+    i = 0
+    for c in graph.vs[comm]:
+        val = _dict.get(c, -1)
+        if val == -1:
+            _dict[c] = i
+            i += 1
+    graph.vs[comm] = [_dict[c] for c in graph.vs[comm]]
+
+
 if __name__ == "__main__":
-    graph = ig.Graph.Full(4)
-    graph.vs["comm"] = [0, 0, 1, 1]
-    graph.vs["test"] = 0
-    partition = ig.VertexClustering.FromAttribute(graph, "comm")
-    subgraph = partition.subgraph(0)
-    print(graph.vs["test"])
-    print(subgraph.vs["test"])
-    subgraph.vs["test"] = 1
-    print(graph.vs["test"])
-    print(subgraph.vs["test"])
+    graph = ig.Graph.Famous("zachary")
+    print(leiden(graph, "comm"))
+
+    print(graph.vs["comm"])
