@@ -17,7 +17,9 @@ class LeidenAlg:
     _multiplicity = "leiden_multiplicity"
     _degree = "leiden_degree"
     _selfEdges = "leiden_selfEdges"
+    _subVertices = "leiden_subVertices"
     _m = "leiden_m"
+    _n = "leiden_n"
     communities = {}
     converged = False
 
@@ -53,23 +55,71 @@ class LeidenAlg:
         self.communities[attr] = output
         return self
 
-    def calculateDQPlus(self, attr, comm, graph_id, vertex, edges, degree):
+    def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         dq = (
             edges / self.graph_stack[-1][graph_id][self._m]
             - ((2 * degreesum + degree) * degree)
             / (2 * self.graph_stack[-1][graph_id][self._m]) ** 2
         )
-        return dq
 
-    def calculateDQMinus(self, attr, comm, graph_id, vertex, edges, degree):
+        # unaggregated graph:
+        dConsistency = 0
+        current = [comm == _comm for _comm in self.graph_stack[-1][graph_id].vs[attr]]
+        for _graph_id in self.graph_neigbors(graph_id):
+            graph = self.graph_stack[-1][_graph_id]
+            adj_comm = graph.vs[vertex_id][attr]
+            adjacent = [adj_comm == _comm for _comm in graph.vs[attr]]
+            dConsistency += sum([curr and adj for curr, adj in zip(current, adjacent)])
+
+        n = self.graph_stack[0][graph_id][self._n]
+        dc = 2 * dConsistency / (n * (n + 1))
+
+        return dq + dc
+
+    def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         dq = (
             -edges / self.graph_stack[-1][graph_id][self._m]
             + ((2 * degreesum - degree) * degree)
             / (2 * self.graph_stack[-1][graph_id][self._m]) ** 2
         )
-        return dq
+
+        # unaggregated graph:
+        dConsistency = 0
+        comm_members = [
+            comm == _comm for _comm in self.graph_stack[-1][graph_id].vs[attr]
+        ]
+        comm_members[vertex_id] = False
+        for graphs in self.graph_stack[-2::-1]:
+            comm_members = [
+                comm_members[index] for index in graphs[graph_id].vs[self._refineIndex]
+            ]
+        vertex = [vertex_id]
+        for graph in self.graph_stack[:0:-1]:
+            vertex = sum([graph[v][self._subVertices] for v in vertex], start=[])
+        for _graph_id in self.graph_neigbors(graph_id):
+            adj_comm = {}
+            for graphs in self.graph_stack[:-1]:
+                graph = graphs[_graph_id]
+
+            graph = self.graph_stack[-1][_graph_id]
+            adjacent = [adj_comm == _comm for _comm in graph.vs[attr]]
+            for curr, adj in zip(comm_members, adjacent):
+                dConsistency += curr * (1 - 2 * adj)
+
+        n = self.graph_stack[0][graph_id][self._n]
+        dc = -2 * dConsistency / (n * (n + 1))
+
+        return dq + dc
+
+    def graph_neigbors(self, graph_id):
+        output = []
+        if graph_id > 0:
+            output.append(graph_id - 1)
+        if graph_id < len(self.graph_stack[0]) - 1:
+            output.append(graph_id + 1)
+        return output
 
     def checkWeights(self):
         for graph in self.graph_stack[0]:
@@ -88,6 +138,7 @@ class LeidenAlg:
             graph.vs[self._selfEdges] = 0
             graph.vs[self._multiplicity] = 1
             graph[self._m] = m / 2
+            graph[self._n] = graph.vcount()
         return self
 
     def aggregate(self):
@@ -98,6 +149,7 @@ class LeidenAlg:
             aggregate_graph = partition.cluster_graph(
                 {None: "first", self._multiplicity: "sum", self._degree: "sum"}, "sum"
             )
+            aggregate_graph.vs[self._subVertices] = list(partition)
             del partition
 
             _dict = {v[self._refine]: v.index for v in aggregate_graph.vs}
@@ -313,27 +365,33 @@ class LeidenAlg:
 # fmt: off
 def leidenClass(graphs, attr, iterations):
     alg = LeidenAlg(graphs)
+    ic("start")
     alg.checkWeights()\
         .initialisePartition(alg._comm)
     for _ in range(iterations):
-        j = 0
+        ic("loop outer")
         alg.localMove(alg._comm)\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
-            .refine(alg._comm, alg._refine)
-        while j < 5 and not alg.converged:
+            .refine(alg._comm, alg._refine)\
+            .cleanCommunities(alg._refine)
+        while not alg.converged:
+            ic("loop inner")
             alg.aggregate()\
                 .localMove(alg._comm)\
                 .cleanCommunities(alg._comm)\
                 .refine(alg._comm, alg._refine)\
+                .cleanCommunities(alg._refine)\
                 .deAggregate()
-            j += 1
     # fmt: on
     for graph in graphs:
         graph.vs[attr] = graph.vs[alg._comm]
         del graph.vs[alg._comm]
         del graph.vs[alg._refine]
         del graph.vs[alg._refineIndex]
+        del graph.vs[alg._selfEdges]
+        del graph.vs[alg._multiplicity]
+        del graph.vs[alg._degree]
         del graph.vs[alg._queued]
 
     alg.renumber(attr)
@@ -374,7 +432,7 @@ if __name__ == "__main__":
         # random.seed(49)
         # random.seed(48)
         random.seed(36)
-        graphs = [GrGen.GirvanNewmanBenchmark(7, density=0.5) for _ in range(5)]
+        graphs = [GrGen.GirvanNewmanBenchmark(7, 4*i, density=0.5) for i in range(3)]
         random.seed(36)
         print(leidenClass(graphs, "comm", 10))
         # ic(graph.vs["comm"])
