@@ -65,12 +65,36 @@ class LeidenAlg:
 
         # unaggregated graph:
         dConsistency = 0
-        current = [comm == _comm for _comm in self.graph_stack[-1][graph_id].vs[attr]]
+        comm_members = [v.index for v in graph.vs if v[attr] == comm]
+        vertex = [vertex_id]
+        for graphs in self.graph_stack[:0:-1]:
+            graph = graphs[graph_id]
+            comm_members = sum(
+                [graph[v][self._subVertices] for v in comm_members], start=[]
+            )
+            vertex = sum([graph[v][self._subVertices] for v in vertex], start=[])
+
         for _graph_id in self.graph_neigbors(graph_id):
+            adj_comm = {}
+            vertex_comm = {}
+            _comm_members = comm_members.copy()
+            _vertex = vertex.copy()
+            for graphs in self.graph_stack[:-1]:
+                graph = graphs[_graph_id]
+                _comm_members = [graph[v][self._refineIndex] for v in _comm_members]
+                _vertex = [graph[v][self._refineIndex] for v in _vertex]
+
             graph = self.graph_stack[-1][_graph_id]
-            adj_comm = graph.vs[vertex_id][attr]
-            adjacent = [adj_comm == _comm for _comm in graph.vs[attr]]
-            dConsistency += sum([curr and adj for curr, adj in zip(current, adjacent)])
+            for v in _vertex:
+                val = graph[v][attr]
+                vertex_comm[val] = vertex_comm.get(val, 0) + 1
+            for v in _comm_members:
+                val = graph[v][attr]
+                adj_comm[val] = adj_comm.get(val, 0) + 1
+
+            for key in vertex_comm:
+                dConsistency += vertex_comm[key] * adj_comm.get(key, 0) * 2
+            dConsistency -= len(vertex) * len(comm_members)
 
         n = self.graph_stack[0][graph_id][self._n]
         dc = 2 * dConsistency / (n * (n + 1))
@@ -79,34 +103,46 @@ class LeidenAlg:
 
     def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
+        graph = self.graph_stack[-1][graph_id]
         dq = (
-            -edges / self.graph_stack[-1][graph_id][self._m]
-            + ((2 * degreesum - degree) * degree)
-            / (2 * self.graph_stack[-1][graph_id][self._m]) ** 2
+            -edges / graph[self._m]
+            + ((2 * degreesum - degree) * degree) / (2 * graph[self._m]) ** 2
         )
 
         # unaggregated graph:
         dConsistency = 0
         comm_members = [
-            comm == _comm for _comm in self.graph_stack[-1][graph_id].vs[attr]
+            v.index for v in graph.vs if v[attr] == comm and v.index != vertex_id
         ]
-        comm_members[vertex_id] = False
-        for graphs in self.graph_stack[-2::-1]:
-            comm_members = [
-                comm_members[index] for index in graphs[graph_id].vs[self._refineIndex]
-            ]
         vertex = [vertex_id]
-        for graph in self.graph_stack[:0:-1]:
+        for graphs in self.graph_stack[:0:-1]:
+            graph = graphs[graph_id]
+            comm_members = sum(
+                [graph[v][self._subVertices] for v in comm_members], start=[]
+            )
             vertex = sum([graph[v][self._subVertices] for v in vertex], start=[])
+
         for _graph_id in self.graph_neigbors(graph_id):
             adj_comm = {}
+            vertex_comm = {}
+            _comm_members = comm_members.copy()
+            _vertex = vertex.copy()
             for graphs in self.graph_stack[:-1]:
                 graph = graphs[_graph_id]
+                _comm_members = [graph[v][self._refineIndex] for v in _comm_members]
+                _vertex = [graph[v][self._refineIndex] for v in _vertex]
 
             graph = self.graph_stack[-1][_graph_id]
-            adjacent = [adj_comm == _comm for _comm in graph.vs[attr]]
-            for curr, adj in zip(comm_members, adjacent):
-                dConsistency += curr * (1 - 2 * adj)
+            for v in _vertex:
+                val = graph[v][attr]
+                vertex_comm[val] = vertex_comm.get(val, 0) + 1
+            for v in _comm_members:
+                val = graph[v][attr]
+                adj_comm[val] = adj_comm.get(val, 0) + 1
+
+            for key in vertex_comm:
+                dConsistency += vertex_comm[key] * adj_comm.get(key, 0) * 2
+            dConsistency -= len(vertex) * len(comm_members)
 
         n = self.graph_stack[0][graph_id][self._n]
         dc = -2 * dConsistency / (n * (n + 1))
