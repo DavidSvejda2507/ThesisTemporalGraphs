@@ -8,7 +8,7 @@ import numpy as np
 import random
 
 n_bins = 15
-n = 100
+n = 1000
 n_iterations = 2
 x = [[None] * n for i in range(2)]
 
@@ -21,7 +21,7 @@ for i in range(n):
     # G = ig.Graph.Famous("Zachary")
     # title = "Histogram of modularities on Zachary's karate klub"
     random.seed(i)
-    x[1][i] = Leiden.leidenClass(G, "comm", n_iterations)
+    x[1][i] = Leiden.leiden(G, "comm", n_iterations)
     # if x[1][i] < 0.38:
     #     print(i)
     random.seed(i)

@@ -22,49 +22,34 @@ theta = 0.02
 
 def leiden(graph, attr, iterations):
     i = 0
-    checkWeights(graph)
+    initialiseGraph(graph)
     communities = initialisePartition(graph, _comm)
 
-    while i < iterations:
-        j = 0
+    for i in range(iterations):
         localMove(graph, communities)
-        # ic("Local Move")
         communities = cleanCommunities(communities)
-        # ic("Clean")
 
         refine_communities = initialisePartition(graph, _refine)
-        converged_inner = refine(graph, communities, refine_communities)
-        # ic("Refine Move")
+        converged = refine(graph, communities, refine_communities)
         refine_communities = cleanCommunities(refine_communities)
-        # ic("Clean")
 
         graphs = [graph]
 
-        while not converged_inner:
+        while not converged:
             _graph = aggregate(graph, refine_communities)
-            # ic("Aggregate")
             graphs.append(_graph)
             graph = _graph
 
             localMove(graph, communities)
-            # ic("Local Move inner")
             communities = cleanCommunities(communities)
-            # ic("Clean")
 
-            converged_inner = refine(graph, communities, refine_communities)
-            # ic("Refine Move inner")
+            converged = refine(graph, communities, refine_communities)
             refine_communities = cleanCommunities(refine_communities)
-            # ic("Clean")
-
-            j += 1
 
         for graph, aggregate_graph in zip(graphs[-2::-1], graphs[:0:-1]):
             deAggregate(graph, aggregate_graph)
-        # ic("Deaggregate")
-        # ic("")
 
         graph = graphs[0]
-        i += 1
 
     graph.vs[attr] = graph.vs[_comm]
     del graph.vs[_comm]
@@ -84,34 +69,44 @@ def quality(graph, comm):
     return graph.modularity(graph.vs[comm])
 
 
-def commQuality(communities, m):
-    modularity = 0
-    for comm in communities:
-        edgecount, degreesum = communities[comm]
-        modularity += edgecount / m - (degreesum / (2 * m)) ** 2
-    return modularity
+def initialiseGraph(graph):
+    """Add weights if they are not present yet,
+    Store the degree of each vertex in each vertex,
+    Initialise selfedges and multiplicity,
+    Store the number of edges in m
 
-
-def checkWeights(graph):
-    m = 0
-    if "weight" in graph.es.attributes():
+    Args:
+        graph (ig.Graph): Graph to apply the algorithm to
+    """
+    m2 = 0
+    if graph.is_weighted():
         for vertex in graph.vs:
             degree = 0
             for neighbor in vertex.neighbors():
                 degree += graph[vertex.index, neighbor]
             vertex[_degree] = degree
-            m += degree
+            m2 += degree
     else:
         graph.es["weight"] = 1
         graph.vs[_degree] = graph.degree(range(graph.vcount()))
-        m = sum(graph.vs[_degree])
+        m2 = sum(graph.vs[_degree])
 
     graph.vs[_selfEdges] = 0
     graph.vs[_multiplicity] = 1
-    graph[_m] = m / 2
+    graph[_m] = m2 / 2
 
 
 def initialisePartition(graph, attribute):
+    """Initialise a partition by assigning each vertex a different index,
+    And make a dictionary containing the number of vertices, internal edges and total degree of each community
+
+    Args:
+        graph (ig.Graph): Graph to initialise the partition of
+        attribute (string): vertex attribute to store the indices in
+
+    Returns:
+        dict: Dictionary containing summaries of all of the communities and the empty community
+    """
     communities = {}
     for index, vertex in enumerate(graph.vs):
         vertex[attribute] = index
@@ -125,7 +120,17 @@ def initialisePartition(graph, attribute):
 
 
 def cleanCommunities(communities):
-    # ic(communities)
+    """Make a copy without any empty communities from a dictionary of community summaries
+
+    Args:
+        communities (dict): Dictionary of community summaries
+
+    Raises:
+        ValueError: Raises an error is a community contains no vertices but still has internal edges or internal degree
+
+    Returns:
+        dict: Clean copy of the input dictionary
+    """
     output = {}
     for key in communities:
         val = communities[key]
@@ -136,11 +141,19 @@ def cleanCommunities(communities):
                 raise ValueError(
                     f"Community with {val[1]} internal edges and {val[2]} internal degree without internal vertices found"
                 )
-    output[-1] = (0, 0, 0)
+    output[-1] = (0, 0, 0)  # Empty community
     return output
 
 
 def makeQueue(count):
+    """Make a queue with the indeces from 0 to count in a random order
+
+    Args:
+        count (int): Number of indices to include
+
+    Returns:
+        SimpleQueue: Queue object filled with indices
+    """
     queue = SimpleQueue()
     indices = list(range(count))
     random.shuffle(indices)
@@ -150,8 +163,12 @@ def makeQueue(count):
 
 
 def localMove(graph, communities):
-    moved = False
+    """Perform the local move step of the Leiden algorithm
 
+    Args:
+        graph (ig.Graph): Graph to work on
+        communities (dict): Dictionary containing summaries of the communities that the vertices are members of
+    """
     queue = makeQueue(graph.vcount())
     graph.vs[_queued] = True
 
@@ -161,14 +178,17 @@ def localMove(graph, communities):
         current_comm = graph.vs[vertex_id][_comm]
         self_edges = graph.vs[vertex_id][_selfEdges]
         neighbors = graph.neighbors(vertex_id)
+
+        # Community_edges contains the total weight of the edges that would be added to or removed from a community if the vertex is moved to/form each community
         community_edges = {-1: self_edges}
+        # Include moving to the empty community (-1) as an option
         for vertex in neighbors:
             comm = graph.vs[vertex][_comm]
             community_edges[comm] = (
                 community_edges.get(comm, self_edges) + graph[vertex_id, vertex]
             )
 
-        max_dq = 0
+        max_dq = 0  # dq is 0 for staying in the current community
         max_comm = current_comm
         cost_of_leaving = calculateDQMinus(
             graph,
@@ -178,9 +198,9 @@ def localMove(graph, communities):
             community_edges.get(current_comm, self_edges),
             degree,
         )
-
         for comm in community_edges.keys():
             if comm != current_comm:
+                # calculateDQPlus assumes that the vertex is not currently part of the target community
                 dq = (
                     calculateDQPlus(
                         graph,
@@ -195,22 +215,15 @@ def localMove(graph, communities):
                 if dq > max_dq:
                     max_dq = dq
                     max_comm = comm
+
         if max_comm != current_comm:
-            #                 message = f"""Moving vertex {vertex_id} from {current_comm} to {max_comm}
-            # vertex {vertex_id} has degree {degree}, and {self_edges} selfedges
-            # the adjacent communities are {community_edges}""" + test_communities(
-            #                     graph, communities, current_comm, max_comm, _comm
-            #                 )
             if max_comm == -1:
-                ic("split")
                 i = 0
                 while True:
                     if communities.get(i, (0, 0, 0))[0] == 0:
-                        break
+                        break  # find a community that is empty or not included in the dictionary
                     i += 1
                 max_comm = i
-
-            # modularity_old = commQuality(communities, graph[_m])
 
             graph.vs[vertex_id][_comm] = max_comm
             update_communities(
@@ -223,49 +236,60 @@ def localMove(graph, communities):
                 degree,
             )
 
-            # modularity_new = commQuality(communities, graph[_m])
-            # if abs(modularity_new - modularity_old - max_dq) > 1e-15:
-            #     ic(abs(modularity_new - modularity_old - max_dq))
-
-            # test_communities(
-            #     graph, communities, current_comm, max_comm, _comm, message
-            # )
-
             for vertex in neighbors:
-                if not graph.vs[vertex][_queued]:
+                if (
+                    not graph.vs[vertex][_queued]
+                    and graph.vs[vertex][_comm] != max_comm
+                ):
                     graph.vs[vertex][_queued] = True
                     queue.put(vertex)
-
-            # cluster = ig.VertexClustering.FromAttribute(graph, _comm)
-            # plot = ig.plot(cluster, "test.pdf", layout="circle")
-            # plt.close(plot.get_figure())
-            # ic(f"{modularity_old}, {modularity_new}")
-            # input(f"{max_dq}")
 
         graph.vs[vertex_id][_queued] = False
 
 
 def refine(graph, communities, refine_communities):
+    """Perform the local move step of the leiden algorithm
+
+    Args:
+        graph (ig.Graph): Graph to work on
+        communities (dict): Dictionary of summaries of the communities
+        refine_communities (dict): Dictionary of summaries of the refinement communities
+
+    Returns:
+        bool: Whether the refinement step has converged
+    """
     converged = True
+    # Not actually queued, but we might as well reuse the existing value
+    graph.vs[_queued] = True
+
     for comm in communities:
+        # Make a list of all of the vertices in community comm
         kwarg = {_comm + "_eq": comm}
         indices = [v.index for v in graph.vs.select(**kwarg)]
         random.shuffle(indices)
 
+        # We don't need to make a queue becuase we only consider vertices that have not yet been merged
         for vertex_id in indices:
-            if refine_communities[graph.vs[vertex_id][_refine]][0] > 1:
+            if not graph.vs[vertex_id]:
                 continue
             neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+            # We only consider neighbors in the same community
             degree = graph.vs[vertex_id][_degree]
             current_comm = graph.vs[vertex_id][_refine]
             self_edges = graph.vs[vertex_id][_selfEdges]
+
             community_edges = {}
+            neighbor = {}
             for vertex in neighbors:
                 refine_comm = vertex[_refine]
                 community_edges[refine_comm] = (
                     community_edges.get(refine_comm, self_edges)
                     + graph[vertex_id, vertex.index]
                 )
+                neighbor[refine_comm] = vertex
+                # The neighbor dict only stores the last neighbor in the list,
+                # but that's fine because if there are multiple neigbors in the same community
+                # they should all be unqueued already anyway
 
             candidates = []
             weights = []
@@ -274,11 +298,10 @@ def refine(graph, communities, refine_communities):
                 refine_communities,
                 current_comm,
                 vertex_id,
-                community_edges.get(current_comm, self_edges),
+                self_edges,  # There should not be any other vertices already in the same community
                 degree,
             )
-
-            for refine_comm in community_edges.keys():
+            for refine_comm in community_edges:
                 dq = (
                     calculateDQPlus(
                         graph,
@@ -293,14 +316,9 @@ def refine(graph, communities, refine_communities):
                 if dq > 0:
                     candidates.append(refine_comm)
                     weights.append(exp(dq / theta))
+
             if len(candidates) > 0:
                 target = random.choices(candidates, weights)[0]
-                #                 message = f"""Moving vertex {vertex_id} from {current_comm} to {target}
-                # vertex {vertex_id} has degree {degree}, and {self_edges} selfedges
-                # the adjacent communities are {community_edges}""" + test_communities(
-                #                     graph, refine_communities, current_comm, target, _refine
-                #                 )
-                # modularity_old = commQuality(refine_communities, graph[_m])
 
                 graph.vs[vertex_id][_refine] = target
                 update_communities(
@@ -312,72 +330,39 @@ def refine(graph, communities, refine_communities):
                     self_edges,
                     degree,
                 )
-                converged = False
 
-                # modularity_new = commQuality(refine_communities, graph[_m])
-                # if abs(modularity_new - modularity_old - dq) > 1e-15:
-                #     ic(abs(modularity_new - modularity_old - dq))
-                # test_communities(
-                #     graph, refine_communities, current_comm, target, _refine, message
-                # )
+                neighbor[target][_queued] = False
+                graph.vs[vertex_id][_queued] = False
+                converged = False
     return converged
 
 
 def update_communities(
     communities, current, future, community_edges, multiplicity, self_edges, degree
 ):
+    """Update the cummunities dictionary to reflect a vertex being moved
+
+    Args:
+        communities (dict): Community summaries
+        current (int): Community that the vertex moved out of
+        future (int): Community that the vertex moves to
+        community_edges (dict): Dictionary of total edgeweight between the vertex being moved and vertices in the community
+        multiplicity (int): Number of vertices represented by the vertex being moved
+        self_edges (double): Total weight of the edges within the vertex being moved
+        degree (double): Total degree of the vertices represented by the vertex being moved
+    """
     old_vertexcount, old_edgecount, old_degreesum = communities[current]
     communities[current] = (
         old_vertexcount - multiplicity,
         old_edgecount - community_edges.get(current, self_edges),
         old_degreesum - degree,
     )
-    old_vertexcount, old_edgecount, old_degreesum = communities[future]
+    old_vertexcount, old_edgecount, old_degreesum = communities.get(future, (0, 0, 0))
     communities[future] = (
         old_vertexcount + multiplicity,
-        old_edgecount + community_edges[future],
+        old_edgecount + community_edges.get(future, self_edges),
         old_degreesum + degree,
     )
-
-
-def test_communities(graph, communities, old, new, attr, message=""):
-    assert old != new
-    degree = 0
-    count = 0
-    stop = False
-    vs = graph.vs.select(**{f"{attr}_eq": old})
-    for i in range(len(vs)):
-        for j in range(i + 1, len(vs)):
-            count += graph[vs[i], vs[j]]
-        degree += vs[i][_degree]
-        count += vs[i][_selfEdges]
-    if communities[old] != ic((len(vs), count, degree)):
-        stop = True
-    old_message = f"Measured: degree = {degree}\t, count = {count}\nStored: degree = {communities[old][2]}\t, count = {communities[old][1]}"
-    degree = 0
-    count = 0
-    vs = graph.vs.select(**{f"{attr}_eq": new})
-    test = f"{[v.index for v in vs]}"
-    for i in range(len(vs)):
-        for j in range(i + 1, len(vs)):
-            count += graph[vs[i], vs[j]]
-            test += f"\nThe edge from {vs[i].index} to {vs[j].index} has weight {graph[vs[i],vs[j]]}"
-        degree += vs[i][_degree]
-        count += vs[i][_selfEdges]
-    if communities[new] != ic((len(vs), count, degree)):
-        stop = True
-    new_message = f"Measured: degree = {degree}\t, count = {count}\nStored: degree = {communities[new][2]}\t, count = {communities[new][1]}"
-
-    if stop:
-        print(message)
-        print("old:")
-        print(old_message)
-        print("new:")
-        print(new_message)
-        print(test)
-        assert False
-
-    return "old:\n" + old_message + "\nnew:\n" + new_message
 
 
 """
@@ -388,25 +373,61 @@ We want to compare having the vertex in the community vs having it in its own co
 
 
 def calculateDQPlus(graph, communities, comm, vertex, edges, degree):
+    """Calculate the change in modularity if the vertex joins the community
+
+    Args:
+        graph (ig.Graph): Current graph
+        communities (dict): Community summaries
+        comm (int): Index of the community we consider moving to
+        vertex (int): Index of the vertex
+        edges (double): Total weight of the edges within the vertex and between the vertex and the community
+        degree (double): Total degree of the vertex
+
+    Returns:
+        double: Change in modularity
+    """
     vertexcount, edgecount, degreesum = communities[comm]
     dq = edges / graph[_m] - ((2 * degreesum + degree) * degree) / (2 * graph[_m]) ** 2
     return dq
 
 
 def calculateDQMinus(graph, communities, comm, vertex, edges, degree):
+    """Calculate the change in modularity if the vertex leaves the community
+
+    Args:
+        graph (ig.Graph): Current graph
+        communities (dict): Community summaries
+        comm (int): Index of the community the vertex is currently part of
+        vertex (int): Index of the vertex
+        edges (double): Total weight of the edges within the vertex and between the vertex and the rest of the community
+        degree (double): Total degree of the vertex
+
+    Returns:
+        double: Change in modularity
+    """
     vertexcount, edgecount, degreesum = communities[comm]
     dq = -edges / graph[_m] + ((2 * degreesum - degree) * degree) / (2 * graph[_m]) ** 2
     return dq
 
 
 def aggregate(graph, communities):
+    """Make the aggregate graph where all refinement communities are represented by individual vertices
+
+    Args:
+        graph (ig.Graph): Current graph
+        communities (dict): Dictionary containing the summaries of the refinement communities
+
+    Returns:
+        ig.Graph: Aggregated graph
+    """
     partition = ig.VertexClustering.FromAttribute(graph, _refine)
     aggregate_graph = partition.cluster_graph(
         {None: "first", _multiplicity: "sum", _degree: "sum"}, "sum"
-    )
+    )  # Vertex attributes should be the same between all of the combined vertices, other than multiplicity and degree which are summed
     del partition
 
     _dict = {v[_refine]: v.index for v in aggregate_graph.vs}
+    # refineIndex is a 'pointer' to the index in the aggregated graph which represents that vertex
     graph.vs[_refineIndex] = [_dict[ref] for ref in graph.vs[_refine]]
     aggregate_graph.vs[_selfEdges] = [
         communities[v[_refine]][1] for v in aggregate_graph.vs
@@ -415,11 +436,25 @@ def aggregate(graph, communities):
     return aggregate_graph
 
 
-def deAggregate(graph, _graph):
-    graph.vs[_comm] = [_graph.vs[index][_comm] for index in graph.vs[_refineIndex]]
+def deAggregate(graph, aggregate_graph):
+    """Deaggregate the community structure of the aggegrated graph to the other graph
+
+    Args:
+        graph (ig.Graph): Graph
+        aggregate_graph (ig.Graph): Aggregated graph
+    """
+    graph.vs[_comm] = [
+        aggregate_graph.vs[index][_comm] for index in graph.vs[_refineIndex]
+    ]
 
 
 def renumber(graph, comm):
+    """Renumbers the attribute to numbers from 0 to n
+
+    Args:
+        graph (ig.Graph): Graph
+        comm (string): Graph attribute to renumber
+    """
     _dict = {}
     i = 0
     for c in graph.vs[comm]:
@@ -432,45 +467,11 @@ def renumber(graph, comm):
 
 if __name__ == "__main__":
     ig.config["plotting.backend"] = "matplotlib"
-    # graphs = [1, 2, 3, 4, 5, 6]
-    # print(graphs[-2::-1])
-    # print(graphs[:0:-1])
-    # for graph, aggregate_graph in zip(graphs[-2::-1], graphs[:0:-1]):
-    #     print(graph, aggregate_graph)
-
-    # g = ig.Graph.Full(4)
-    # g.vs["comm"] = [0, 0, 1, 1]
-    # g.vs[_degree] = [3, 3, 3, 3]
-    # g.es["weight"] = [1, 1, 1, 1, 1, 1]
-    # g["m"] = 17
-    # part = ig.VertexClustering.FromAttribute(g, "comm")
-    # g2 = part.cluster_graph({None: "first", _degree: "sum"}, "sum")
-    # print(g2.summary())
-    # print(g["m"])
-    # print(g2["m"])
-    # print(g2.es.attributes())
-    # print(g2.es["weight"])
-    # print(g2.vs["comm"])
-    # print(g2.vs[_degree])
-
-    # ic.disable()
     for i in range(1):
-        # graph = ig.Graph.Famous("Cubical")
         # graph = ig.Graph.Famous("zachary")
-        # random.seed(49)
-        # random.seed(48)
-        random.seed(36)
-        graph = GrGen.GirvanNewmanBenchmark(7, density=0.5)
-        random.seed(36)
+        random.seed(888)
+        graph = GrGen.GirvanNewmanBenchmark(7, density=1)
+        random.seed(888)
         print(leiden(graph, "comm", 10))
-        # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graph, "comm")
         ig.plot(cluster, "test.pdf")
-    # print(graph.vs["comm"])
-
-    # print("###########################################")
-
-    # for i in range(10):
-    #     graph = ig.Graph.Famous("zachary")
-    #     print(leidenClass(graph, "comm"))
-    # # print(graph.vs["comm"])
