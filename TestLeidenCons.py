@@ -1,5 +1,5 @@
 import igraph as ig
-import Leiden
+import LeidenConsistency
 import leidenalg
 import GraphGenerators as GrGen
 
@@ -21,7 +21,7 @@ for i in range(n):
     # G = ig.Graph.Famous("Zachary")
     # title = "Histogram of modularities on Zachary's karate klub"
     random.seed(i)
-    x[1][i] = Leiden.leiden(G, "comm", n_iterations)
+    x[1][i] = LeidenConsistency.leiden([G], "comm", n_iterations)[0]
     # if x[1][i] < 0.38:
     #     print(i)
     random.seed(i)
@@ -37,4 +37,4 @@ ax.hist(x, n_bins, histtype="bar", color=colors, label=labels)
 ax.legend(prop={"size": 10})
 ax.set_title(title)
 
-fig.savefig("Leiden_comp.pdf")
+fig.savefig("Leiden_comp_consistency.pdf")

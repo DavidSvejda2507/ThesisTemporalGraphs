@@ -17,25 +17,33 @@ _degree = "leiden_degree"
 _selfEdges = "leiden_selfEdges"
 _m = "leiden_m"
 
-theta = 0.02
+theta = 0.01
 
 
 def leiden(graph, attr, iterations):
-    i = 0
+    # ic("start")
     initialiseGraph(graph)
     communities = initialisePartition(graph, _comm)
+    # ic(graph.vs[_comm])
+    # input()
 
-    for i in range(iterations):
+    for _ in range(iterations):
+        # ic("loop outer")
         localMove(graph, communities)
+        # ic(graph.vs[_comm])
+        # input()
         communities = cleanCommunities(communities)
 
         refine_communities = initialisePartition(graph, _refine)
         converged = refine(graph, communities, refine_communities)
+        # ic(graph.vs[_refine])
+        # input()
         refine_communities = cleanCommunities(refine_communities)
 
         graphs = [graph]
 
         while not converged:
+            # ic("loop inner")
             _graph = aggregate(graph, refine_communities)
             graphs.append(_graph)
             graph = _graph
@@ -111,11 +119,8 @@ def initialisePartition(graph, attribute):
     for index, vertex in enumerate(graph.vs):
         vertex[attribute] = index
         communities[index] = (vertex[_multiplicity], 0, vertex[_degree])
-    communities[-1] = (
-        0,
-        0,
-        0,
-    )  # Moving to community -1 corresponds to moving to a new community
+    # Moving to community -1 corresponds to moving to a new community
+    communities[-1] = (0, 0, 0)
     return communities
 
 
@@ -198,7 +203,7 @@ def localMove(graph, communities):
             community_edges.get(current_comm, self_edges),
             degree,
         )
-        for comm in community_edges.keys():
+        for comm in community_edges:
             if comm != current_comm:
                 # calculateDQPlus assumes that the vertex is not currently part of the target community
                 dq = (
@@ -263,14 +268,16 @@ def refine(graph, communities, refine_communities):
     graph.vs[_queued] = True
 
     for comm in communities:
+        # ic(comm)
         # Make a list of all of the vertices in community comm
         kwarg = {_comm + "_eq": comm}
         indices = [v.index for v in graph.vs.select(**kwarg)]
         random.shuffle(indices)
+        # ic(indices)
 
         # We don't need to make a queue becuase we only consider vertices that have not yet been merged
         for vertex_id in indices:
-            if not graph.vs[vertex_id]:
+            if not graph.vs[vertex_id][_queued]:
                 continue
             neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
             # We only consider neighbors in the same community
@@ -290,6 +297,7 @@ def refine(graph, communities, refine_communities):
                 # The neighbor dict only stores the last neighbor in the list,
                 # but that's fine because if there are multiple neigbors in the same community
                 # they should all be unqueued already anyway
+            # ic(community_edges)
 
             candidates = []
             weights = []
@@ -316,6 +324,9 @@ def refine(graph, communities, refine_communities):
                 if dq > 0:
                     candidates.append(refine_comm)
                     weights.append(exp(dq / theta))
+            # ic(candidates)
+            # ic(weights)
+            # input()
 
             if len(candidates) > 0:
                 target = random.choices(candidates, weights)[0]
@@ -334,6 +345,8 @@ def refine(graph, communities, refine_communities):
                 neighbor[target][_queued] = False
                 graph.vs[vertex_id][_queued] = False
                 converged = False
+        # ic(graph.vs[_refine])
+        # input()
     return converged
 
 
