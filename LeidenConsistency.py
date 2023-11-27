@@ -6,23 +6,21 @@ from math import exp
 from queue import SimpleQueue
 
 import GraphGenerators as GrGen
+import GraphAnalysis as GrAn
 import matplotlib.pyplot as plt
 
 # fmt: off
-def leiden(graphs, attr, iterations):
-    alg = LeidenClass(graphs)
+def leiden(graphs, attr, iterations, consistency_weight):
+    alg = LeidenClass(graphs, consistency_weight)
     # ic("start")
     alg.initialiseGraph()\
-        .initialisePartition(alg._comm)\
-        .show(alg._comm)
+        .initialisePartition(alg._comm)
     for _ in range(iterations):
         # ic("loop outer")
         alg.localMove(alg._comm)\
-            .show(alg._comm)\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
             .refine(alg._comm, alg._refine)\
-            .show(alg._refine)\
             .cleanCommunities(alg._refine)
         while not alg.converged:
             # ic("loop inner")
@@ -48,7 +46,7 @@ def leiden(graphs, attr, iterations):
     alg.renumber(attr)
     del alg
 
-    return [quality(graphs[i], attr) for i in range(len(graphs))]
+    return sum(quality(graphs, attr, consistency_weight))
 
 
 class LeidenClass:
@@ -65,17 +63,12 @@ class LeidenClass:
     communities = {}
     converged = False
 
-    def __init__(self, graphs, gamma=1, theta=0.01):
+    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01):
         self.graph_stack = [graphs]
         self.gamma = gamma
         self.theta = theta
-        
-    def show(self, attr):
-        return self
-        graph = self.graph_stack[-1][0]
-        ic(graph.vs[attr])
-        input()
-        
+        self.consistency_weight = consistency_weight
+
     def initialiseGraph(self):
         for graph in self.graph_stack[0]:
             m2 = 0
@@ -102,7 +95,8 @@ class LeidenClass:
         for graph in self.graph_stack[-1]:
             for vertex in graph.vs:
                 vertex[attr] = i
-                communities[i] = (vertex[self._multiplicity], 0, vertex[self._degree])
+                communities[i] = (vertex[self._multiplicity],
+                                  0, vertex[self._degree])
                 i += 1
         communities[-1] = (0, 0, 0)
         self.communities[attr] = communities
@@ -124,6 +118,7 @@ class LeidenClass:
         return self
 
     def localMove(self, attr):
+        ic("localMove")
         graphs = self.graph_stack[-1]
         communities = self.communities[attr]
         queue = SimpleQueue()
@@ -134,7 +129,7 @@ class LeidenClass:
         length = 0
         for index, graph in enumerate(graphs):
             l = graph.vcount()
-            indices[length : length + l] = list(zip([index] * l, range(l)))
+            indices[length: length + l] = list(zip([index] * l, range(l)))
             length += l
         random.shuffle(indices)
         for i in indices:
@@ -143,29 +138,29 @@ class LeidenClass:
             graph.vs[self._queued] = True
 
         while not queue.empty():
+            print(".", end="", flush=True)
             graph_id, vertex_id = queue.get()
             graph = graphs[graph_id]
             degree = graph.vs[vertex_id][self._degree]
             current_comm = graph.vs[vertex_id][self._comm]
             self_edges = graph.vs[vertex_id][self._selfEdges]
             neighbors = graph.neighbors(vertex_id)
-            
-            
-            community_edges = {-1: self_edges}
+
+            community_edges = {-1: 0}
             for vertex in neighbors:
                 comm = graph.vs[vertex][self._comm]
                 community_edges[comm] = (
-                    community_edges.get(comm, self_edges) + graph[vertex_id, vertex]
+                    community_edges.get(comm, 0) + graph[vertex_id, vertex]
                 )
 
-            max_dq = 0
+            max_dq = [0]
             max_comm = current_comm
             cost_of_leaving = self.calculateDQMinus(
                 attr,
                 current_comm,
                 graph_id,
                 vertex_id,
-                community_edges.get(current_comm, self_edges),
+                community_edges.get(current_comm, 0),
                 degree,
             )
             for comm in community_edges:
@@ -181,7 +176,7 @@ class LeidenClass:
                         )
                         + cost_of_leaving
                     )
-                    if dq > max_dq:
+                    if sum(dq) > sum(max_dq):
                         max_dq = dq
                         max_comm = comm
 
@@ -218,36 +213,36 @@ class LeidenClass:
         return self
 
     def refine(self, attr, refine_attr):
+        ic("refine")
         self.converged = True
         graphs = self.graph_stack[-1]
         communities = self.communities[attr]
         for graph_id, graph in enumerate(graphs):
             graph.vs[self._queued] = True
             for comm in communities:
-                # ic(comm)
                 kwarg = {self._comm + "_eq": comm}
                 indices = [v.index for v in graph.vs.select(**kwarg)]
                 random.shuffle(indices)
-                # ic(indices)
 
                 for vertex_id in indices:
+                    print(".", end="", flush=True)
                     if not graph.vs[vertex_id][self._queued]:
                         continue
-                    neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+                    neighbors = graph.vs[graph.neighbors(
+                        vertex_id)].select(**kwarg)
                     degree = graph.vs[vertex_id][self._degree]
                     current_comm = graph.vs[vertex_id][self._refine]
                     self_edges = graph.vs[vertex_id][self._selfEdges]
-                    
+
                     community_edges = {}
                     neighbor = {}
                     for vertex in neighbors:
                         refine_comm = vertex[self._refine]
                         community_edges[refine_comm] = (
-                            community_edges.get(refine_comm, self_edges)
+                            community_edges.get(refine_comm, 0)
                             + graph[vertex_id, vertex.index]
                         )
                         neighbor[refine_comm] = vertex
-                    # ic(community_edges)
 
                     candidates = []
                     weights = []
@@ -256,7 +251,7 @@ class LeidenClass:
                         current_comm,
                         graph_id,
                         vertex_id,
-                        self_edges,
+                        0,
                         degree,
                     )
                     for refine_comm in community_edges:
@@ -271,19 +266,16 @@ class LeidenClass:
                             )
                             + cost_of_leaving
                         )
-                        if dq > 0:
-                            candidates.append(refine_comm)
-                            weights.append(exp(dq / self.theta))
-                    # ic(candidates)
-                    # ic(weights)
-                    # input()
+                        if sum(dq) > 0:
+                            candidates.append((refine_comm, dq))
+                            weights.append(exp(sum(dq) / self.theta))
 
                     if len(candidates) > 0:
-                        target = random.choices(candidates, weights)[0]
-                        
-                        graph.vs[vertex_id][self._refine] = target
+                        target, dq = random.choices(candidates, weights)[0]
+
+                        graph.vs[vertex_id][refine_attr] = target
                         self.update_communities(
-                            self._refine,
+                            refine_attr,
                             current_comm,
                             target,
                             community_edges,
@@ -291,22 +283,18 @@ class LeidenClass:
                             self_edges,
                             degree,
                         )
-                        
+
                         neighbor[target][self._queued] = False
                         graph.vs[vertex_id][self._queued] = False
                         self.converged = False
-                # ic(graph.vs[self._refine])
-                # input()
         return self
 
-    def update_communities(
-        self, attr, current, future, community_edges, multiplicity, self_edges, degree
-    ):
+    def update_communities(self, attr, current, future, community_edges, multiplicity, self_edges, degree):
         communities = self.communities[attr]
         old_vertexcount, old_edgecount, old_degreesum = communities[current]
         communities[current] = (
             old_vertexcount - multiplicity,
-            old_edgecount - community_edges.get(current, self_edges),
+            old_edgecount - (community_edges.get(current, 0) + self_edges),
             old_degreesum - degree,
         )
         old_vertexcount, old_edgecount, old_degreesum = communities.get(
@@ -314,28 +302,27 @@ class LeidenClass:
         )
         communities[future] = (
             old_vertexcount + multiplicity,
-            old_edgecount + community_edges.get(future, self_edges),
+            old_edgecount + (community_edges.get(future, 0) + self_edges),
             old_degreesum + degree,
         )
 
     def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
+        graph = self.graph_stack[-1][graph_id]
         dq = (
-            edges / self.graph_stack[-1][graph_id][self._m]
-            - ((2 * degreesum + degree) * degree)
-            / (2 * self.graph_stack[-1][graph_id][self._m]) ** 2
+            edges / graph[self._m]
+            - ((2 * degreesum) * degree) / (2 * graph[self._m]) ** 2
         )
-        return dq
 
         dConsistency = 0
         comm_members = [v.index for v in graph.vs if v[attr] == comm]
         vertex = [vertex_id]
         for graphs in self.graph_stack[:0:-1]:
             graph = graphs[graph_id]
-            comm_members = sum(
-                [graph[v][self._subVertices] for v in comm_members], start=[]
-            )
-            vertex = sum([graph[v][self._subVertices] for v in vertex], start=[])
+            comm_members = sum([graph.vs[v][self._subVertices]
+                                for v in comm_members], start=[])
+            vertex = sum([graph.vs[v][self._subVertices]
+                         for v in vertex], start=[])
 
         for _graph_id in self.graph_neigbors(graph_id):
             adj_comm = {}
@@ -344,46 +331,45 @@ class LeidenClass:
             _vertex = vertex.copy()
             for graphs in self.graph_stack[:-1]:
                 graph = graphs[_graph_id]
-                _comm_members = [graph[v][self._refineIndex] for v in _comm_members]
-                _vertex = [graph[v][self._refineIndex] for v in _vertex]
+                _comm_members = [graph.vs[v][self._refineIndex]
+                                 for v in _comm_members]
+                _vertex = [graph.vs[v][self._refineIndex] for v in _vertex]
 
             graph = self.graph_stack[-1][_graph_id]
             for v in _vertex:
-                val = graph[v][attr]
+                val = graph.vs[v][attr]
                 vertex_comm[val] = vertex_comm.get(val, 0) + 1
             for v in _comm_members:
-                val = graph[v][attr]
+                val = graph.vs[v][attr]
                 adj_comm[val] = adj_comm.get(val, 0) + 1
-
+                
             for key in vertex_comm:
                 dConsistency += vertex_comm[key] * adj_comm.get(key, 0) * 2
             dConsistency -= len(vertex) * len(comm_members)
-
+            
         n = self.graph_stack[0][graph_id][self._n]
-        dc = 2 * dConsistency / (n * (n + 1))
+        dc = 2*dConsistency / (n * (n - 1))
 
-        return dq + dc
+        return (dq, self.consistency_weight * dc)
 
     def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
             -edges / graph[self._m]
-            + ((2 * degreesum - degree) * degree) / (2 * graph[self._m]) ** 2
+            + ((2 * (degreesum - degree)) * degree) / (2 * graph[self._m]) ** 2
         )
-        return dq
 
         dConsistency = 0
-        comm_members = [
-            v.index for v in graph.vs if v[attr] == comm and v.index != vertex_id
-        ]
+        comm_members = [v.index for v in graph.vs if v[attr]
+                        == comm and v.index != vertex_id]
         vertex = [vertex_id]
         for graphs in self.graph_stack[:0:-1]:
             graph = graphs[graph_id]
-            comm_members = sum(
-                [graph[v][self._subVertices] for v in comm_members], start=[]
-            )
-            vertex = sum([graph[v][self._subVertices] for v in vertex], start=[])
+            comm_members = sum([graph.vs[v][self._subVertices]
+                                for v in comm_members], start=[])
+            vertex = sum([graph.vs[v][self._subVertices]
+                         for v in vertex], start=[])
 
         for _graph_id in self.graph_neigbors(graph_id):
             adj_comm = {}
@@ -392,15 +378,16 @@ class LeidenClass:
             _vertex = vertex.copy()
             for graphs in self.graph_stack[:-1]:
                 graph = graphs[_graph_id]
-                _comm_members = [graph[v][self._refineIndex] for v in _comm_members]
-                _vertex = [graph[v][self._refineIndex] for v in _vertex]
+                _comm_members = [graph.vs[v][self._refineIndex]
+                                 for v in _comm_members]
+                _vertex = [graph.vs[v][self._refineIndex] for v in _vertex]
 
             graph = self.graph_stack[-1][_graph_id]
             for v in _vertex:
-                val = graph[v][attr]
+                val = graph.vs[v][attr]
                 vertex_comm[val] = vertex_comm.get(val, 0) + 1
             for v in _comm_members:
-                val = graph[v][attr]
+                val = graph.vs[v][attr]
                 adj_comm[val] = adj_comm.get(val, 0) + 1
 
             for key in vertex_comm:
@@ -408,9 +395,9 @@ class LeidenClass:
             dConsistency -= len(vertex) * len(comm_members)
 
         n = self.graph_stack[0][graph_id][self._n]
-        dc = -2 * dConsistency / (n * (n + 1))
+        dc = -2*dConsistency / (n * (n - 1))
 
-        return dq + dc
+        return (dq, self.consistency_weight * dc)
 
     def graph_neigbors(self, graph_id):
         output = []
@@ -426,13 +413,15 @@ class LeidenClass:
         for graph in self.graph_stack[-1]:
             partition = ig.VertexClustering.FromAttribute(graph, self._refine)
             aggregate_graph = partition.cluster_graph(
-                {None: "first", self._multiplicity: "sum", self._degree: "sum"}, "sum"
+                {None: "first", self._multiplicity: "sum",
+                    self._degree: "sum"}, "sum"
             )
             aggregate_graph.vs[self._subVertices] = list(partition)
             del partition
 
             _dict = {v[self._refine]: v.index for v in aggregate_graph.vs}
-            graph.vs[self._refineIndex] = [_dict[ref] for ref in graph.vs[self._refine]]
+            graph.vs[self._refineIndex] = [_dict[ref]
+                                           for ref in graph.vs[self._refine]]
             aggregate_graph.vs[self._selfEdges] = [
                 communities[v[self._refine]][1] for v in aggregate_graph.vs
             ]
@@ -441,16 +430,19 @@ class LeidenClass:
         return self
 
     def deAggregate(self):
+        self.deAggregate_Unwind(self._comm)
+        self.graph_stack = [self.graph_stack[0]]
+        return self
+
+    def deAggregate_Unwind(self, attr):
         for graphs, aggregate_graphs in zip(
             self.graph_stack[-2::-1], self.graph_stack[:0:-1]
         ):
             for graph, aggregate_graph in zip(graphs, aggregate_graphs):
-                graph.vs[self._comm] = [
-                    aggregate_graph.vs[index][self._comm]
+                graph.vs[attr] = [
+                    aggregate_graph.vs[index][attr]
                     for index in graph.vs[self._refineIndex]
                 ]
-        self.graph_stack = [self.graph_stack[0]]
-        return self
 
     def renumber(self, attr):
         _dict = {}
@@ -465,8 +457,36 @@ class LeidenClass:
             graph.vs[attr] = [_dict[c] for c in graph.vs[attr]]
         return self
 
-def quality(graph, comm):
-    return graph.modularity(graph.vs[comm])
+    def stack_quality(self, attr, consistency_weight):
+        self.deAggregate_Unwind(attr)
+        return quality(self.graph_stack[0], attr, consistency_weight)
+
+
+def quality(graphs, attr, consistency_weight):
+    mod_quality = 0
+    for graph in graphs:
+        mod_quality += graph.modularity(graph.vs[attr])
+
+    cons_quality = 0
+    comms1 = renumber(graphs[0].vs[attr])
+    for graph in graphs[1:]:
+        comms2 = renumber(graph.vs[attr])
+        cons_quality += GrAn.Consistency(comms1, comms2)
+        comms1 = comms2
+    return (mod_quality, consistency_weight * cons_quality)
+
+
+def renumber(lst):
+    dct = {}
+    i = 0
+    out = [None] * len(lst)
+    for j, val in enumerate(lst):
+        if dct.get(val, -1) == -1:
+            dct[val] = i
+            i += 1
+        out[j] = dct[val]
+    return out
+
 
 if __name__ == "__main__":
     ig.config["plotting.backend"] = "matplotlib"
@@ -495,12 +515,11 @@ if __name__ == "__main__":
     for i in range(1):
         # graph = ig.Graph.Famous("Cubical")
         # graph = ig.Graph.Famous("zachary")
-        # random.seed(49)
-        # random.seed(48)
-        random.seed(36)
-        graphs = [GrGen.GirvanNewmanBenchmark(7, 4*i, density=0.5) for i in range(3)]
-        random.seed(36)
-        print(leiden(graphs, "comm", 10))
+        random.seed(i)
+        graphs = [GrGen.GirvanNewmanBenchmark(
+            7, 4 * i, density=0.5) for i in range(3)]
+        random.seed(i)
+        print(leiden(graphs, "comm", 1, 0.564843))
         # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graphs[0], "comm")
         ig.plot(cluster, "test.pdf")

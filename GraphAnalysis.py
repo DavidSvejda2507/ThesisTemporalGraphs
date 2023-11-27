@@ -55,8 +55,24 @@ def calculateAccuracy(partition, reference, k=None):
     return correct / n, mapping
 
 
+from numba.core.errors import NumbaDeprecationWarning, NumbaPendingDeprecationWarning
+import warnings
+
+warnings.simplefilter("ignore", category=NumbaDeprecationWarning)
+warnings.simplefilter("ignore", category=NumbaPendingDeprecationWarning)
+
+
 @numba.jit(nopython=True)
 def Consistency(partition1, partition2):
+    """Calculates the consistency of the partitions, assumes that the communities are numbred 0 through k
+
+    Args:
+        partition1 (iterable): list of integers specifying community membership
+        partition2 (iterable): list of integers specifying community membership
+
+    Returns:
+        double: Consistency value
+    """
     assert len(partition1) == len(partition2)
     vs = len(partition1)
     k1 = max(partition1) + 1
