@@ -311,7 +311,7 @@ class LeidenClass:
         graph = self.graph_stack[-1][graph_id]
         dq = (
             edges / graph[self._m]
-            - ((2 * degreesum) * degree) / (2 * graph[self._m]) ** 2
+            - (2 * degreesum * degree) / (2 * graph[self._m]) ** 2
         )
 
         dConsistency = 0
@@ -357,7 +357,7 @@ class LeidenClass:
         graph = self.graph_stack[-1][graph_id]
         dq = (
             -edges / graph[self._m]
-            + ((2 * (degreesum - degree)) * degree) / (2 * graph[self._m]) ** 2
+            + (2 * (degreesum - degree) * degree) / (2 * graph[self._m]) ** 2
         )
 
         dConsistency = 0

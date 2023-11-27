@@ -400,7 +400,7 @@ def calculateDQPlus(graph, communities, comm, vertex, edges, degree):
         double: Change in modularity
     """
     vertexcount, edgecount, degreesum = communities[comm]
-    dq = edges / graph[_m] - ((2 * degreesum + degree) * degree) / (2 * graph[_m]) ** 2
+    dq = edges / graph[_m] - (2 * degreesum * degree) / (2 * graph[_m]) ** 2
     return dq
 
 
@@ -419,7 +419,7 @@ def calculateDQMinus(graph, communities, comm, vertex, edges, degree):
         double: Change in modularity
     """
     vertexcount, edgecount, degreesum = communities[comm]
-    dq = -edges / graph[_m] + ((2 * degreesum - degree) * degree) / (2 * graph[_m]) ** 2
+    dq = -edges / graph[_m] + (2 * (degreesum - degree) * degree) / (2 * graph[_m]) ** 2
     return dq
 
 
