@@ -6,6 +6,7 @@ import GraphPlotting as grPlt
 import GraphAnalysis as grAn
 import GraphClusterers as grCls
 import warnings
+from math import exp
 
 warnings.simplefilter("ignore", UserWarning)
 
@@ -124,28 +125,33 @@ clusterers = [
     #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
     #     "label": "Merge-partition",
     # },
+    # {
+    #     "method": grCls.clusterConnected,
+    #     "ks": [
+    #         0.1,
+    #         0.05,
+    #         0.02,
+    #         0.01,
+    #         0.007,
+    #         0.005,
+    #         0.004,
+    #         0.003,
+    #         0.0025,
+    #         0.002,
+    #         0.0015,
+    #         0.001,
+    #         0.0007,
+    #         0.0005,
+    #         0.0002,
+    #         0.0001,
+    #         0,
+    #     ],
+    #     "label": "Connected-partition",
+    # },
     {
-        "method": grCls.clusterConnected,
-        "ks": [
-            0.1,
-            0.05,
-            0.02,
-            0.01,
-            0.007,
-            0.005,
-            0.004,
-            0.003,
-            0.0025,
-            0.002,
-            0.0015,
-            0.001,
-            0.0007,
-            0.0005,
-            0.0002,
-            0.0001,
-            0,
-        ],
-        "label": "Connected-partition",
+        "method": grCls.consistencyLeiden,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency-Leiden-partition",
     },
 ]
 

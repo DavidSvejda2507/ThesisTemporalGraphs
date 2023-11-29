@@ -2,6 +2,7 @@ import igraph as ig
 import leidenalg
 import numba
 import GraphAnalysis as grAn
+import LeidenConsistency as LeiCons
 
 
 def clusterStacked(graphs, k):
@@ -120,3 +121,8 @@ def clusterVariance2(graphs, k):
     partitions[-1] = clusters[-1][max_index[1]]
 
     return partitions
+
+def consistencyLeiden(graphs, k, iterations = 2):
+    LeiCons.leiden(graphs, "comm", iterations, k)
+    
+    return [graph.vs["comm"] for graph in graphs]

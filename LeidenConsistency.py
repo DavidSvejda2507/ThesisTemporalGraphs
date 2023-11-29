@@ -138,7 +138,6 @@ class LeidenClass:
             graph.vs[self._queued] = True
 
         while not queue.empty():
-            print(".", end="", flush=True)
             graph_id, vertex_id = queue.get()
             graph = graphs[graph_id]
             degree = graph.vs[vertex_id][self._degree]
@@ -225,7 +224,6 @@ class LeidenClass:
                 random.shuffle(indices)
 
                 for vertex_id in indices:
-                    print(".", end="", flush=True)
                     if not graph.vs[vertex_id][self._queued]:
                         continue
                     neighbors = graph.vs[graph.neighbors(
