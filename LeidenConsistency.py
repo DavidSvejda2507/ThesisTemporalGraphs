@@ -10,11 +10,10 @@ import GraphAnalysis as GrAn
 import matplotlib.pyplot as plt
 
 # fmt: off
-def leiden(graphs, attr, iterations, consistency_weight):
+def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True):
     alg = LeidenClass(graphs, consistency_weight)
     # ic("start")
-    alg.initialiseGraph()\
-        .initialisePartition(alg._comm)
+    alg.initialiseGraph(initialisation)
     for _ in range(iterations):
         # ic("loop outer")
         alg.localMove(alg._comm)\
@@ -33,17 +32,14 @@ def leiden(graphs, attr, iterations, consistency_weight):
     # fmt: on
     for graph in graphs:
         graph.vs[attr] = graph.vs[alg._comm]
-        del graph.vs[alg._comm]
-        del graph.vs[alg._refine]
-        del graph.vs[alg._refineIndex]
-        del graph.vs[alg._queued]
-        del graph.vs[alg._multiplicity]
-        del graph.vs[alg._degree]
-        del graph.vs[alg._selfEdges]
+        for name in [alg._comm, alg._refine, alg._refineIndex, alg._queued, alg._multiplicity, alg._degree, alg._selfEdges]:
+            if attr!=name:
+                del graph.vs[name]
         del graph[alg._m]
         del graph[alg._n]
 
-    alg.renumber(attr)
+    if sanitise:
+        alg.renumber(attr)
     del alg
 
     return sum(quality(graphs, attr, consistency_weight))
@@ -69,7 +65,7 @@ class LeidenClass:
         self.theta = theta
         self.consistency_weight = consistency_weight
 
-    def initialiseGraph(self):
+    def initialiseGraph(self, initialisation):
         for graph in self.graph_stack[0]:
             m2 = 0
             if graph.is_weighted():
@@ -87,6 +83,11 @@ class LeidenClass:
             graph.vs[self._multiplicity] = 1
             graph[self._m] = m2 / 2
             graph[self._n] = graph.vcount()
+            
+        if initialisation is None:
+            self.initialisePartition(self._comm)
+        else:
+            self.initialisePartitionFromAttribute(self._comm, initialisation)
         return self
 
     def initialisePartition(self, attr):
@@ -101,6 +102,20 @@ class LeidenClass:
         communities[-1] = (0, 0, 0)
         self.communities[attr] = communities
         return self
+    
+    def initialisePartitionFromAttribute(self, comm, init):
+        communities = {}
+        for i, graph in enumerate(self.graph_stack[0]):
+            for v in graph.vs:
+                v[comm] = str(i) + "_" + str(v[init])
+                old = communities.get(v[comm], (0,0,0))
+                neighbors = graph.vs[graph.neighbors(v.index)].select(**{self._comm + "_eq": v[comm]})
+                weight = sum(graph[v, neighbor] for neighbor in neighbors)
+                communities[v[comm]] = (old[0]+1, old[1]+weight, old[2] + v[self._degree])
+        communities[-1] = (0,0,0)
+        self.communities[comm] = communities
+                
+        
 
     def cleanCommunities(self, attr):
         output = {}
@@ -181,7 +196,6 @@ class LeidenClass:
 
             if max_comm != current_comm:
                 if max_comm == -1:
-                    ic("split")
                     i = 0
                     communities = self.communities[attr]
                     while True:

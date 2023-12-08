@@ -126,3 +126,11 @@ def consistencyLeiden(graphs, k, iterations = 2):
     LeiCons.leiden(graphs, "comm", iterations, k)
     
     return [graph.vs["comm"] for graph in graphs]
+
+def initialisedConsistencyLeiden(graphs, k, iterations = 2):
+    membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
+    for graph in graphs:
+        graph.vs["init"] = membership
+    LeiCons.leiden(graphs, "comm", iterations, k, "init")
+
+    return [graph.vs["comm"] for graph in graphs]

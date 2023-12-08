@@ -62,6 +62,71 @@ def stochasticBlockFromCummunities(communities, p_in, p_out):
     G.vs["community"] = comm_vector
     return G
 
+def MergingSplitting(k_out, offset, density=1):
+    k_in = 16 - k_out
+    p_in = density * k_in / 31
+    p_out = density * k_out / 96
+    n_turns = offset // 32
+    offset = offset % 32
+    
+    if n_turns%2==0:
+        progress = 1-abs(offset-16)/16
+        p_inter = progress*p_in + (1-progress)*p_out
+        pref_matrix = [
+            [p_in, p_inter, p_out, p_out],
+            [p_inter, p_in, p_out, p_out],
+            [p_out, p_out, p_in, p_inter],
+            [p_out, p_out, p_inter, p_in],
+        ]
+        communities = [
+            (0,32),
+            (0 if progress>0.5 else 2,32),
+            (4,32),
+            (4 if progress>0.5 else 6,32),
+        ]
+    else:
+        progress = abs(offset-16)/16
+        p_inter = progress*p_in + (1-progress)*p_out
+        pref_matrix = [
+            [p_in, p_inter, p_out, p_out, p_out, p_out, p_out, p_out],
+            [p_inter, p_in, p_out, p_out, p_out, p_out, p_out, p_out],
+            [p_out, p_out, p_in, p_inter, p_out, p_out, p_out, p_out],
+            [p_out, p_out, p_inter, p_in, p_out, p_out, p_out, p_out],
+            [p_out, p_out, p_out, p_out, p_in, p_inter, p_out, p_out],
+            [p_out, p_out, p_out, p_out, p_inter, p_in, p_out, p_out],
+            [p_out, p_out, p_out, p_out, p_out, p_out, p_in, p_inter],
+            [p_out, p_out, p_out, p_out, p_out, p_out, p_inter, p_in],
+        ]
+        communities = [
+            (0,16),
+            (0 if progress>0.5 else 1,16),
+            (2,16),
+            (2 if progress>0.5 else 3,16),
+            (4,16),
+            (4 if progress>0.5 else 5,16),
+            (6,16),
+            (6 if progress>0.5 else 7,16),
+        ]
+        
+    block_sizes = [length for _, length in communities]
+
+    G = ig.Graph.SBM(
+        n=sum(block_sizes),
+        pref_matrix=pref_matrix,
+        block_sizes=block_sizes,
+        directed=False,
+        loops=False,
+    )
+
+    comm_vector = []
+    for comm, length in communities:
+        comm_vector += [comm] * length
+
+    G.vs["community"] = comm_vector
+    print(comm_vector)
+    return G
+    
+
 
 def addWeights(w1, w2):
     if w1 is None and w2 is None:
@@ -128,8 +193,11 @@ def concatGraphs(graphs, weight):
 if __name__ == "__main__":
     print("Testing GraphGenerators")
 
-    GirvanNewmanBenchmark(6, 16)
-    GirvanNewmanBenchmark(6, 48)
+    # GirvanNewmanBenchmark(6, 16)
+    # GirvanNewmanBenchmark(6, 48)
 
-    print()
-    TestCreationDestruction(6, 16)
+    # print()
+    # TestCreationDestruction(6, 16)
+
+    for i in range(0, 65, 4):
+        MergingSplitting(6, i, 1)
