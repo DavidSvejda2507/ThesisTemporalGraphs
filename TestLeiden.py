@@ -8,7 +8,7 @@ import numpy as np
 import random
 
 n_bins = 15
-n = 100
+n = 1
 n_iterations = 2
 x = [[None] * n for i in range(2)]
 

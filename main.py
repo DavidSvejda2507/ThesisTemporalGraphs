@@ -119,7 +119,7 @@ def ClusterTest(GenerationPars, clusterers, title, filename):
 
 # Parameters
 n_steps = 2**5
-n_turns = 4
+n_turns = 2
 k_out = 7
 
 if n_steps > 32 * n_turns:
@@ -135,48 +135,48 @@ GenerationPars = {
     "density": 0.5,
 }
 clusterers = [
-    # {
-    #     "method": grCls.clusterVariance,
-    #     "ks": [1, 2, 3, 4, 5, 6, 7, 8],
-    #     "label": "Variance of optimal solutions",
-    #     "filename": "Variance1",
-    # },
-    # {
-    #     "method": grCls.clusterVariance2,
-    #     "ks": [1, 2, 3, 4, 5],
-    #     "label": "Variance of optimal solutions with depth 2",
-    #     "filename": "Variance2",
-    # },
     {
-        "method": grCls.clusterStacked,
-        "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
-        "label": "Merge-partition",
-        "filename": "Stacked",
+        "method": grCls.clusterVariance,
+        "ks": [1, 2, 3, 4, 5, 6, 7, 8],
+        "label": "Variance of optimal solutions",
+        "filename": "Variance1",
     },
     {
-        "method": grCls.clusterConnected,
-        "ks": [
-            0.1,
-            0.05,
-            0.02,
-            0.01,
-            0.007,
-            0.005,
-            0.004,
-            0.003,
-            0.0025,
-            0.002,
-            0.0015,
-            0.001,
-            0.0007,
-            0.0005,
-            0.0002,
-            0.0001,
-            0,
-        ],
-        "label": "Connected-partition",
-        "filename": "Connected",
+        "method": grCls.clusterVariance2,
+        "ks": [1, 2, 3, 4, 5],
+        "label": "Variance of optimal solutions with depth 2",
+        "filename": "Variance2",
     },
+    # {
+    #     "method": grCls.clusterStacked,
+    #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
+    #     "label": "Merge-partition",
+    #     "filename": "Stacked",
+    # },
+    # {
+    #     "method": grCls.clusterConnected,
+    #     "ks": [
+    #         0.1,
+    #         0.05,
+    #         0.02,
+    #         0.01,
+    #         0.007,
+    #         0.005,
+    #         0.004,
+    #         0.003,
+    #         0.0025,
+    #         0.002,
+    #         0.0015,
+    #         0.001,
+    #         0.0007,
+    #         0.0005,
+    #         0.0002,
+    #         0.0001,
+    #         0,
+    #     ],
+    #     "label": "Connected-partition",
+    #     "filename": "Connected",
+    # },
     {
         "method": grCls.consistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],

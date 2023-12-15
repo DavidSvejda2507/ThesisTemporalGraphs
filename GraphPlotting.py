@@ -35,17 +35,46 @@ def shapeMap(inputs=None):
         raise NotImplementedError()
     
 def press(event):
-    global fig, ax1, ax2, ax3, parts
-    print(event)
-    ig.plot(parts[1], ax3, mark_groups=False)
+    global fig, ax1, ax2, ax3, parts, layouts, i
+    print(event.key)
+    if event.key == 'right': i = min(i+1, len(parts)-2)
+    elif event.key == 'left': i = max(i-1, 1)
+    elif event.key == 'enter': plt.close(fig)
+    if event.key in ['right', 'left']:
+        # print(i)
+        ax1.clear()
+        ax2.clear()
+        ax3.clear()
+        # ig.plot(parts[i-1], ax1, layout = layouts[i], mark_groups = True)
+        # ig.plot(parts[i  ], ax2, layout = layouts[i], mark_groups = True)
+        # ig.plot(parts[i+1], ax3, layout = layouts[i], mark_groups = True)
+        ig.plot(parts[i-1], ax1, layout = layouts[i])
+        ig.plot(parts[i  ], ax2, layout = layouts[i])
+        ig.plot(parts[i+1], ax3, layout = layouts[i])
+        # print(dir(ax1.title))
+        ax1.title.set_text(f"{i-1}")
+        ax2.title.set_text(f"{i}")
+        ax3.title.set_text(f"{i+1}")
+        fig.canvas.draw() 
+        fig.canvas.flush_events() 
 
 def PlotGraphseries(graphs, comm):
-    global fig, ax1, ax2, ax3, parts
+    global fig, ax1, ax2, ax3, parts, layouts, i
+    i=1
     parts = [ig.VertexClustering(graph, graph.vs[comm]) for graph in graphs]
-    fig, (ax1, ax2, ax3) = plt.subplots(3)
-    ig.plot(parts[0], ax1, mark_groups = True)
-    ig.plot(parts[1], ax2, mark_groups = True)
-    ig.plot(parts[2], ax3, mark_groups = True)
+    layouts = [graph.layout() for graph in graphs]
+    fig, (ax1, ax2, ax3) = plt.subplots(1,3, figsize = (18,7))
+    # ig.plot(parts[i-1], ax1, layout = layouts[i], mark_groups = True)
+    # ig.plot(parts[i  ], ax2, layout = layouts[i], mark_groups = True)
+    # ig.plot(parts[i+1], ax3, layout = layouts[i], mark_groups = True)
+    ig.plot(parts[i-1], ax1, layout = layouts[i])
+    ig.plot(parts[i  ], ax2, layout = layouts[i])
+    ig.plot(parts[i+1], ax3, layout = layouts[i])
+    # print(dir(ax1.title))
+    ax1.title.set_text(f"{i-1}")
+    ax2.title.set_text(f"{i}")
+    ax3.title.set_text(f"{i+1}")
+
     fig.canvas.mpl_connect('key_press_event', press)
     
     fig.show()
@@ -53,5 +82,6 @@ def PlotGraphseries(graphs, comm):
     
 if __name__ == "__main__":
     import GraphGenerators as GrGen
-    graphs = [GrGen.GirvanNewmanBenchmark(6, i, 1) for i in range(3)]
+    graphs = [GrGen.GirvanNewmanBenchmark(6, i, 1) for i in range(5)]
     PlotGraphseries(graphs, "community")
+    input("Press return to end\n")
