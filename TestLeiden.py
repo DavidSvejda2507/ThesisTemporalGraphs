@@ -7,8 +7,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+import argparse as ap
+
+parser = ap.ArgumentParser()
+parser.add_argument("n_runs", type=int, help="The number of runs of both algorithms")
+args = parser.parse_args()
+
 n_bins = 15
-n = 1
+n = args.n_runs
 n_iterations = 2
 x = [[None] * n for i in range(2)]
 
