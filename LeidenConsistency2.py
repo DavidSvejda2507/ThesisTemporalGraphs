@@ -244,15 +244,51 @@ class LeidenClass:
                 options.append(option(comm, graph_id, {graph_id:comm}, sum(dq), graph_id, graph_id))
         
         # Find the options and modularities for first move
-        vertex_groups.append((graph_id+1, self.matchToNextGraph(graph_id, graph_id+1, [vertex_id])))
+        vertices = self.matchToNextGraph(graph_id, graph_id+1, [vertex_id])
+        vertex_groups.append((graph_id+1, vertices))
+        graph = self.graph_stack[-1][graph_id+1]
         
-        """ CAREFULL: REPLACES PREVIOUS COMMUNITY EDGES """
-        community_edges = {-1: 0}
-        for vertex in neighbors:
-            comm = graph.vs[vertex][self._comm]
-            community_edges[comm] = (
-                community_edges.get(comm, 0) + graph[vertex_id, vertex]
-            )
+        current_comm_connections = {} # Only connections between selected vertices and other vertices of their current comm (by comm)
+        comm_connections = {} # All connections between selected vertices and other vertices (by comm)
+        current_comm_degrees = {} # Total degree of all selected vertices by comm
+        internal_edges = 0 # Total weight of edges between vertices in the selection, which are in different communities
+        for vertex in vertices:
+            neighbors = graph.neighbors(vertex)
+            current_comm = graph.vs[vertex][self._comm]
+            current_degree = graph.vs[vertex][self._degree]
+            current_comm_degrees[current_comm] = current_comm_degrees.get(current_comm, 0) + current_degree
+            for neighbor in neighbors:
+                neighbor_comm = graph.vs[neighbor][self._comm]
+                if neighbor not in vertices:
+                    if neighbor_comm == current_comm:
+                        degree, edges = current_comm_connections.get(neighbor_comm, (0,0))
+                        current_comm_connections[neighbor_comm] = (degree + current_degree, edges + graph[vertex, neighbor])
+                    degree, edges = comm_connections.get(neighbor_comm, (0,0))
+                    comm_connections[neighbor_comm] = (degree + current_degree, edges + graph[vertex, neighbor])
+                else:
+                    if neighbor_comm != current_comm:
+                        internal_edges += graph[vertex, neighbor]
+        internal_edges /= 2 # Correct for double counting of internal edges
+                        
+        # Calculate the dq of leaving the current communities
+        cost_of_leaving_q = 0
+        temp_communities = {}
+        m = graph[self._m]
+        for comm in current_comm_connections:
+            degree, edges = current_comm_connections[comm]
+            _, _, degree_sum = self.communities[self._comm][comm]
+            cost_of_leaving_q += -edges / m + (2 * (degree_sum - degree) * degree) / (2 * m) ** 2
+            temp_communities[comm] = degree_sum-degree
+        # Add the dq of the different vertices comming together
+        cost_of_leaving_q += internal_edges / m
+        total_degree = 0
+        degrees_squared = 0
+        for comm in current_comm_degrees:
+            degree = current_comm_degrees[comm]
+            degrees_squared += degree * degree
+            total_degree += degree
+        cost_of_leaving_q += (degrees_squared-total_degree**2)/((2*m)**2)
+        
         # Find the consistencies for each pair of 0- and 1-moves
         # Update current options to new layer
         # Update final options with potential improvements
