@@ -33,7 +33,7 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
     # fmt: on
     for graph in graphs:
         graph.vs[attr] = graph.vs[alg._comm]
-        for name in [alg._comm, alg._refine, alg._refineIndex, alg._queued, alg._multiplicity, alg._degree, alg._selfEdges]:
+        for name in [alg._comm, alg._refine, alg._refineIndex, alg._queued, alg._inQueue, alg._multiplicity, alg._degree, alg._selfEdges]:
             if attr!=name:
                 del graph.vs[name]
         del graph[alg._m]
@@ -51,6 +51,7 @@ class LeidenClass:
     _refine = "leiden_commLeidenRefinement"
     _refineIndex = "leiden_refinementIndex"
     _queued = "leiden_queued"
+    _inQueue = "leiden_inQueue"
     _multiplicity = "leiden_multiplicity"
     _degree = "leiden_degree"
     _selfEdges = "leiden_selfEdges"
@@ -151,239 +152,225 @@ class LeidenClass:
             queue.put(i)
         for graph in graphs:
             graph.vs[self._queued] = True
+            graph.vs[self._inQueue] = True
 
         while not queue.empty():
             graph_id, vertex_id = queue.get()
             self.localMoveVertex(graph_id, vertex_id, queue)
         return self
     
-    def matchToNextGraph(self, graph_id_old, graph_id_new, vertices):
-        graph = self.graph_stack[-1][graph_id_old]
-        size = 0
-        for v in vertices: size+=graph.vs[v][self._multiplicity]
-        
+    def matchToNextGraph(self, graph_id_old, graph_id_new, vertex):
         # find the list of vertices in the base graph represented by the current vertex(es)
-        for graphs in self.graph_stack[:0:-1]:
-            graph = graphs[graph_id_old]
-            vertices = sum([graph.vs[v][self._subVertices]
-                                for v in vertices], start=[])
+        vertices = self.deAggregateVertex(graph_id_old, [vertex])
         # Trace where the vertices end up in the next graph
-        _vertices = vertices.copy()
-        for graphs in self.graph_stack[:-1]:
-            graph = graphs[graph_id_new]
-            _vertices = [graph.vs[v][self._refineIndex]
-                                for v in _vertices]
+        vertices = self.reAggregateVertex(graph_id_new, vertices)
         # Count how many vertices in each aggregated vertex
         vertices_new = {}
         graph = self.graph_stack[-1][graph_id_new]
-        for v in _vertices:
+        for v in vertices:
             vertices_new[v] = vertices_new.get(v, 0) + 1
         
         # Measure overlap
         candidates = []
+        weights = []
         for v in vertices_new:
-            candidates.append((vertices_new[v]/graph.vs[v][self._multiplicity], vertices_new[v], v))
+            candidates.append(v)
+            weights.append(vertices_new[v]**2/graph.vs[v][self._multiplicity])
         
         # candidates.sort(key = lambda x:x[0], reverse=True)
         # Select which vertices to add to the output
-        output = []
-        for overlap, _, index in candidates:
-            if overlap**2 > random.uniform(0,1):
-                output.append(index)
-            
+        return random.choices(candidates, weights)[0]
+      
+    def findMoves(self, graph, vertex_id, current_graph_id, community_edges_dict):
+        set_list = namedtuple("set_list", ["vertices", "old_comm", "new_comms", "set_names"],)
     
-    def localMoveVertex(self, graph_id, vertex_id, queue):
-        communities = self.communities[self._comm]
-        graphs = self.graph_stack[-1]
-        graph = graphs[graph_id]
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._comm]
-        self_edges = graph.vs[vertex_id][self._selfEdges]
         neighbors = graph.neighbors(vertex_id)
-        finalOption = namedtuple("finalOption", ["source_target", "target_comms", "dQ", "range_plus", "range_minus"])
-        option = namedtuple("option", ["target", "graph", "target_comms", "dQ", "range_plus", "range_minus"])
-        finalOptions = []
-        options = []
-        vertex_groups = [(graph_id, [vertex_id])]
         
+        community_edges = {-1: 0}
+        for vertex in neighbors:
+            comm = graph.vs[vertex][self._comm]
+            community_edges[comm] = (
+                community_edges.get(comm, 0) + graph[vertex_id, vertex]
+            )
+        community_edges_dict[current_graph_id] = community_edges
+            
+        cost_of_leaving, current_comm_members, vertex_members = self.calculateDQMinus(
+            self._comm,
+            current_comm,
+            current_graph_id,
+            vertex_id,
+            community_edges.get(current_comm, 0),
+            degree,
+        )
+        local_options = {-1:cost_of_leaving}
+        
+        neighbor_comms = {}
+        set_names = [-1]
+        next_comms = set_list(frozenset(vertex_members), frozenset(current_comm_members), neighbor_comms, set_names)
+        
+        for comm in community_edges:
+            if comm != current_comm:
+                dq, neighbor_comm = self.calculateDQPlus(
+                        self._comm,
+                        comm,
+                        current_graph_id,
+                        vertex_id,
+                        community_edges[comm],
+                        degree,
+                    )
+                local_options[comm] = dq + cost_of_leaving
+                set_names.append(comm)
+                neighbor_comms[comm] = frozenset(neighbor_comm)
+
+        return local_options, next_comms
+ 
+    def cross_intersect(self, vertex1, comm1, vertex2, comm2):
+        vv = len(vertex1.intersect(vertex2))
+        vc = len(vertex1.intersect(comm2))
+        cv = len(comm1.intersect(vertex2))
+        cc = len(comm1.intersect(comm2))
+        return vv*cc + vc*cv
+           
+    def calculate_interactions(self, set_list1, set_list2, normalisation_factor):
+        output = {}
+        for key1 in set_list1.set_names:
+            output[key1] = {}
+        
+        output[-1][-1] = self.cross_intersect(set_list1.vertices, set_list1.old_comm, set_list2.vertices, set_list2.old_comm)
+        for key2 in set_list2.set_names[1:]:
+            intersection = self.cross_intersect(set_list1.vertices, set_list1.old_comm, set_list2.vertices, set_list2.new_comms[key2])
+            output[-1][key2] = output[-1][-1] - intersection
+            
+        for key1 in set_list1.set_names[1:]:
+            intersection = self.cross_intersect(set_list1.vertices, set_list1.new_comms[key1], set_list2.vertices, set_list2.old_comm)
+            output[key1][-1] = output[-1][-1] - intersection
+            for key2 in set_list2.set_names[1:]:
+                intersection = self.cross_intersect(set_list1.vertices, set_list1.new_comms[key1], set_list2.vertices, set_list2.new_comms[key2])
+                output[-1][key2] = -output[-1][-1] + output[-1][key2] + output[key1][-1] + intersection
+            
+        normalisation_factor *= 2
+        for key1 in set_list1.set_names:
+            for key2 in set_list2.set_names:
+                output[key1][key2] *= normalisation_factor
+        
+        return output
+           
+    def updateOptions(self, final_options, intermediate_options, local_options, interactions, graph_id):
+        final_option = namedtuple("final_option", ["source_target", "target_comms", "dQ"])
+        option = namedtuple("option", ["target", "graph", "source_target", "target_comms", "dQ"])
+        next_options = []
+        for index, final_opt in enumerate(final_options):
+            for local_opt in local_options:
+                max_dQ = -1e10
+                best_intermediate = None
+                intermediate_options = (opt for opt in option if opt.source_target == final_opt.source_target)
+                for inter_opt in intermediate_options:
+                    dQ = inter_opt.dQ + sum(local_options[local_opt]) + interactions[inter_opt.target][local_opt]
+                    dq = sum(local_options[local_opt][0::2])
+                    dc = sum(local_options[local_opt][1::2]) + interactions[inter_opt.target][local_opt]
+                    if (dq>0 or dc>0) and dQ > max_dQ:
+                        max_dQ = dQ
+                        best_intermediate = inter_opt
+                if best_intermediate is not None:
+                    targets = best_intermediate.target_comms.copy()
+                    targets[graph_id] = local_opt
+                    new_opt = option(local_opt, graph_id, final_opt.source_target, targets, max_dQ)
+                    next_options.append(new_opt)
+                    if max_dQ > final_opt.dQ:
+                        final_opt = final_option(**new_opt)
+                        final_options[index] = final_opt
+        return next_options
+
+    def localMoveVertex(self, graph_id, vertex_id, queue):
+        graphs = self.graph_stack[-1]
+        graph = graphs[graph_id]
+        
+        graph.vs[vertex_id][self._inQueue] = False
+        if not graph.vs[vertex_id][self._queued]:
+            return
+        
+        
+        consistency_normalisation_factor = 2/(graph[self._n]*(graph[self._n]-1))
+        selected_vertices = {graph_id: vertex_id}
+        community_edges_dict = {}
         
         # Find the options and qualities for 1 slice moves
+        local_options, base_comms = self.findMoves(graph, vertex_id, graph_id, community_edges_dict)
+        
         # Initialise as final options
-        community_edges = {-1: 0}
-        for vertex in neighbors:
-            comm = graph.vs[vertex][self._comm]
-            community_edges[comm] = (
-                community_edges.get(comm, 0) + graph[vertex_id, vertex]
-            )
-            
-        cost_of_leaving = self.calculateDQMinus(
-            self._comm,
-            current_comm,
-            graph_id,
-            vertex_id,
-            community_edges.get(current_comm, 0),
-            degree,
-        )
-        finalOptions.append(finalOption(-1, {graph_id:-1}, sum(cost_of_leaving), graph_id, graph_id))
-        options.append(option(-1, graph_id, {graph_id:-1}, sum(cost_of_leaving), graph_id, graph_id))
+        final_option = namedtuple("final_option", ["source_target", "target_comms", "dQ"])
+        final_options = []
+        option = namedtuple("option", ["target", "graph", "source_target", "target_comms", "dQ"])
+        options = []
         
-        for comm in community_edges:
-            if comm != current_comm:
-                dq = (
-                    self.calculateDQPlus(
-                        self._comm,
-                        comm,
-                        graph_id,
-                        vertex_id,
-                        community_edges[comm],
-                        degree,
-                    )
-                    + cost_of_leaving
+        for comm in local_options:
+            final_options.append(final_option(comm, {graph_id:comm}, sum(local_options[comm])))
+            options.append(option(comm, graph_id, comm, {graph_id:comm}, sum(local_options[comm])))
+            
+        
+        for direction, limit in [(-1, -1), (1, len(self.graph_stack[0]))]:
+            previous_comms = base_comms
+            previous_graph_id = graph_id
+            for current_graph_id in range(graph_id+direction, limit, direction):
+                
+                # Find the options and modularities for moves
+                vertex_id = self.matchToNextGraph(previous_graph_id, current_graph_id, vertex_id)
+                selected_vertices[current_graph_id] = vertex_id
+                graph = self.graph_stack[-1][current_graph_id]
+                
+                local_options, next_comms = self.findMoves(graph, vertex_id, current_graph_id, community_edges_dict)
+                
+                # Find the consistencies for each pair of moves
+                interactions = self.calculate_interactions(previous_comms, next_comms, consistency_normalisation_factor)
+                
+                # Update current options to new layer
+                # Update final options with potential improvements
+                options = self.updateOptions(final_options, options, local_options, interactions, current_graph_id)
+                
+                if len(options) < 1: break
+                previous_comms = next_comms
+                previous_graph_id = current_graph_id
+                
+        final_option = max(final_options, key = lambda x:x.dQ)
+        if final_option.dQ > 0:
+            communities = self.communities[self._comm]
+            for graph_id in final_option.target_comms:
+                graph = graphs[graph_id]
+                vertex_id = selected_vertices[graph_id]
+                target_comm = target_comm[graph_id]
+                
+                if target_comm == -1:
+                    i = 0
+                    while True:
+                        if communities.get(i, (0, 0, 0))[0] == 0:
+                            break
+                        i += 1
+                    target_comm = i
+                
+                self.update_communities(
+                    self._comm,
+                    graph.vs[vertex_id][self._comm],
+                    target_comm,
+                    community_edges_dict[graph_id],
+                    graph.vs[vertex_id][self._multiplicity],
+                    graph.vs[vertex_id][self._selfEdges],
+                    graph.vs[vertex_id][self._degree],
                 )
-                finalOptions.append(finalOption(comm, {graph_id:comm}, sum(dq), graph_id, graph_id))
-                options.append(option(comm, graph_id, {graph_id:comm}, sum(dq), graph_id, graph_id))
-        
-        # Find the options and modularities for first move
-        vertices = self.matchToNextGraph(graph_id, graph_id+1, [vertex_id])
-        vertex_groups.append((graph_id+1, vertices))
-        graph = self.graph_stack[-1][graph_id+1]
-        
-        current_comm_connections = {} # Only connections between selected vertices and other vertices of their current comm (by comm)
-        comm_connections = {} # All connections between selected vertices and other vertices (by comm)
-        current_comm_degrees = {} # Total degree of all selected vertices by comm
-        internal_edges = 0 # Total weight of edges between vertices in the selection, which are in different communities
-        for vertex in vertices:
-            neighbors = graph.neighbors(vertex)
-            current_comm = graph.vs[vertex][self._comm]
-            current_degree = graph.vs[vertex][self._degree]
-            current_comm_degrees[current_comm] = current_comm_degrees.get(current_comm, 0) + current_degree
-            for neighbor in neighbors:
-                neighbor_comm = graph.vs[neighbor][self._comm]
-                if neighbor not in vertices:
-                    if neighbor_comm == current_comm:
-                        degree, edges = current_comm_connections.get(neighbor_comm, (0,0))
-                        current_comm_connections[neighbor_comm] = (degree + current_degree, edges + graph[vertex, neighbor])
-                    degree, edges = comm_connections.get(neighbor_comm, (0,0))
-                    comm_connections[neighbor_comm] = (degree + current_degree, edges + graph[vertex, neighbor])
-                else:
-                    if neighbor_comm != current_comm:
-                        internal_edges += graph[vertex, neighbor]
-        internal_edges /= 2 # Correct for double counting of internal edges
-                        
-        # Calculate the dq of leaving the current communities
-        cost_of_leaving_q = 0
-        temp_communities = {}
-        m = graph[self._m]
-        for comm in current_comm_connections:
-            degree, edges = current_comm_connections[comm]
-            _, _, degree_sum = self.communities[self._comm][comm]
-            cost_of_leaving_q += -edges / m + (2 * (degree_sum - degree) * degree) / (2 * m) ** 2
-            temp_communities[comm] = degree_sum-degree
-        # Add the dq of the different vertices comming together
-        cost_of_leaving_q += internal_edges / m
-        total_degree = 0
-        degrees_squared = 0
-        for comm in current_comm_degrees:
-            degree = current_comm_degrees[comm]
-            degrees_squared += degree * degree
-            total_degree += degree
-        cost_of_leaving_q += (degrees_squared-total_degree**2)/((2*m)**2)
-        
-        # Find the consistencies for each pair of 0- and 1-moves
-        # Update current options to new layer
-        # Update final options with potential improvements
-        # Do not discard bad moves
-        
-        # Find the options and modularities for second move 
-        
-        # Find the consistencies for each pair of 1- and 2-moves
-        # Update current options to new layer
-        # Update final options with potential improvements
-        # Do not discard bad moves
-        
-        
-            
-    
-    def localMoveVertex(self, graph_id, vertex_id, queue):
-        communities = self.communities[self._comm]
-        graphs = self.graph_stack[-1]
-        graph = graphs[graph_id]
-        degree = graph.vs[vertex_id][self._degree]
-        current_comm = graph.vs[vertex_id][self._comm]
-        self_edges = graph.vs[vertex_id][self._selfEdges]
-        neighbors = graph.neighbors(vertex_id)
-        
+                graph.vs[vertex_id][self._comm] = target_comm
 
-        vertices_under_consideration = {0:[vertex_id]}
-        community_edges_dict = {0:community_edges}
-        source_result = namedtuple("result", ["target_comm", "dQ", "list_plus", "list_minus"])
-        result = namedtuple("result", ["target_comm", "graph_offset", "previous_target", "dQ"])
-        results = [source_result(current_comm, 0, None, 0, [], [])]
-        
-        community_edges = {-1: 0}
-        for vertex in neighbors:
-            comm = graph.vs[vertex][self._comm]
-            community_edges[comm] = (
-                community_edges.get(comm, 0) + graph[vertex_id, vertex]
-            )
-            
-        cost_of_leaving = self.calculateDQMinus(
-            self._comm,
-            current_comm,
-            graph_id,
-            vertex_id,
-            community_edges.get(current_comm, 0),
-            degree,
-        )
-        for comm in community_edges:
-            if comm != current_comm:
-                dq = (
-                    self.calculateDQPlus(
-                        self._comm,
-                        comm,
-                        graph_id,
-                        vertex_id,
-                        community_edges[comm],
-                        degree,
-                    )
-                    + cost_of_leaving
-                )
-                if sum(dq) > 0 or dq[0] + dq[2] > 0:
-                    max_dq = dq
-                    max_comm = comm
+                for vertex in graph.neighbors(vertex_id):
+                    if (
+                        not graph.vs[vertex][self._queued]
+                        and graph.vs[vertex][self._comm] != target_comm
+                    ):
+                        graph.vs[vertex][self._queued] = True
+                        if not graph.vs[vertex[self._inQueue]]:
+                            queue.put((graph_id, vertex))
 
-
-        if max_comm != current_comm:
-            if max_comm == -1:
-                i = 0
-                communities = self.communities[self._comm]
-                while True:
-                    if communities.get(i, (0, 0, 0))[0] == 0:
-                        break
-                    i += 1
-                max_comm = i
-            graph.vs[vertex_id][self._comm] = max_comm
-            self.update_communities(
-                self._comm,
-                current_comm,
-                max_comm,
-                community_edges,
-                graph.vs[vertex_id][self._multiplicity],
-                self_edges,
-                degree,
-            )
-
-            for vertex in neighbors:
-                if (
-                    not graph.vs[vertex][self._queued]
-                    and graph.vs[vertex][self._comm] != max_comm
-                ):
-                    graph.vs[vertex][self._queued] = True
-                    queue.put((graph_id, vertex))
-
-        graph.vs[vertex_id][self._queued] = False
-        
-
+                graph.vs[vertex_id][self._queued] = False
+       
     def refine(self):
         ic("refine")
         self.converged = True
@@ -421,7 +408,7 @@ class LeidenClass:
 
         candidates = []
         weights = []
-        cost_of_leaving = self.calculateDQMinus(
+        cost_of_leaving, _, _ = self.calculateDQMinus(
             self._refine,
             current_comm,
             graph_id,
@@ -430,8 +417,7 @@ class LeidenClass:
             degree,
         )
         for refine_comm in community_edges:
-            dq = (
-                self.calculateDQPlus(
+            dq, _ = self.calculateDQPlus(
                     self._refine,
                     refine_comm,
                     graph_id,
@@ -439,8 +425,7 @@ class LeidenClass:
                     community_edges[refine_comm],
                     degree,
                 )
-                + cost_of_leaving
-            )
+            dq += cost_of_leaving
             if sum(dq) > 0:
                 candidates.append((refine_comm, dq))
                 weights.append(exp(sum(dq) / self.theta))
@@ -505,7 +490,7 @@ class LeidenClass:
             output.append(_dict)
         return output
 
-    def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree):
+    def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree, deaggregated_vertex = None):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
@@ -515,8 +500,12 @@ class LeidenClass:
 
         dConsistency = 0
         comm_members = [v.index for v in graph.vs if v[attr] == comm]
-        vertex = [vertex_id]
-        comm_members, vertex = self.deAggregateVertex(graph_id, comm_members, vertex)
+        if deaggregated_vertex is None:
+            vertex = [vertex_id]
+            comm_members, vertex = self.deAggregateVertex(graph_id, comm_members, vertex)
+        else:
+            comm_members = self.deAggregateVertex(graph_id, comm_members)
+            vertex = deaggregated_vertex
 
         for _graph_id in self.graph_neigbors(graph_id):
             _comm_members = comm_members.copy()
@@ -533,7 +522,7 @@ class LeidenClass:
         n = self.graph_stack[0][graph_id][self._n]
         dc = 2*dConsistency / (n * (n - 1))
 
-        return (dq, self.consistency_weight * dc)
+        return (dq, self.consistency_weight * dc), comm_members
 
     def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
@@ -564,7 +553,7 @@ class LeidenClass:
         n = self.graph_stack[0][graph_id][self._n]
         dc = -2*dConsistency / (n * (n - 1))
 
-        return (dq, self.consistency_weight * dc)
+        return (dq, self.consistency_weight * dc), comm_members, vertex
 
     def graph_neigbors(self, graph_id):
         output = []
