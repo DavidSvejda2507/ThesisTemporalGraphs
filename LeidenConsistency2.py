@@ -66,6 +66,7 @@ class LeidenClass:
         self.gamma = gamma
         self.theta = theta
         self.consistency_weight = consistency_weight
+        self.counter = 0
 
     def initialiseGraph(self, initialisation):
         for graph in self.graph_stack[0]:
@@ -161,9 +162,9 @@ class LeidenClass:
     
     def matchToNextGraph(self, graph_id_old, graph_id_new, vertex):
         # find the list of vertices in the base graph represented by the current vertex(es)
-        vertices = self.deAggregateVertex(graph_id_old, [vertex])
+        vertices, = self.deAggregateVertex(graph_id_old, [vertex])
         # Trace where the vertices end up in the next graph
-        vertices = self.reAggregateVertex(graph_id_new, vertices)
+        vertices, = self.reAggregateVertex(graph_id_new, vertices)
         # Count how many vertices in each aggregated vertex
         vertices_new = {}
         graph = self.graph_stack[-1][graph_id_new]
@@ -211,7 +212,7 @@ class LeidenClass:
         next_comms = set_list(frozenset(vertex_members), frozenset(current_comm_members), neighbor_comms, set_names)
         
         for comm in community_edges:
-            if comm != current_comm:
+            if comm != current_comm and comm != -1:
                 dq, neighbor_comm = self.calculateDQPlus(
                         self._comm,
                         comm,
@@ -227,10 +228,10 @@ class LeidenClass:
         return local_options, next_comms
  
     def cross_intersect(self, vertex1, comm1, vertex2, comm2):
-        vv = len(vertex1.intersect(vertex2))
-        vc = len(vertex1.intersect(comm2))
-        cv = len(comm1.intersect(vertex2))
-        cc = len(comm1.intersect(comm2))
+        vv = len(vertex1.intersection(vertex2))
+        vc = len(vertex1.intersection(comm2))
+        cv = len(comm1.intersection(vertex2))
+        cc = len(comm1.intersection(comm2))
         return vv*cc + vc*cv
            
     def calculate_interactions(self, set_list1, set_list2, normalisation_factor):
@@ -248,9 +249,10 @@ class LeidenClass:
             output[key1][-1] = output[-1][-1] - intersection
             for key2 in set_list2.set_names[1:]:
                 intersection = self.cross_intersect(set_list1.vertices, set_list1.new_comms[key1], set_list2.vertices, set_list2.new_comms[key2])
-                output[-1][key2] = -output[-1][-1] + output[-1][key2] + output[key1][-1] + intersection
+                output[key1][key2] = -output[-1][-1] + output[-1][key2] + output[key1][-1] + intersection
             
         normalisation_factor *= 2
+        normalisation_factor *= self.consistency_weight
         for key1 in set_list1.set_names:
             for key2 in set_list2.set_names:
                 output[key1][key2] *= normalisation_factor
@@ -265,7 +267,7 @@ class LeidenClass:
             for local_opt in local_options:
                 max_dQ = -1e10
                 best_intermediate = None
-                intermediate_options = (opt for opt in option if opt.source_target == final_opt.source_target)
+                intermediate_options = (opt for opt in intermediate_options if opt.source_target == final_opt.source_target)
                 for inter_opt in intermediate_options:
                     dQ = inter_opt.dQ + sum(local_options[local_opt]) + interactions[inter_opt.target][local_opt]
                     dq = sum(local_options[local_opt][0::2])
@@ -279,7 +281,7 @@ class LeidenClass:
                     new_opt = option(local_opt, graph_id, final_opt.source_target, targets, max_dQ)
                     next_options.append(new_opt)
                     if max_dQ > final_opt.dQ:
-                        final_opt = final_option(**new_opt)
+                        final_opt = final_option(final_opt.source_target, targets, max_dQ)
                         final_options[index] = final_opt
         return next_options
 
@@ -290,7 +292,6 @@ class LeidenClass:
         graph.vs[vertex_id][self._inQueue] = False
         if not graph.vs[vertex_id][self._queued]:
             return
-        
         
         consistency_normalisation_factor = 2/(graph[self._n]*(graph[self._n]-1))
         selected_vertices = {graph_id: vertex_id}
@@ -313,6 +314,7 @@ class LeidenClass:
         for direction, limit in [(-1, -1), (1, len(self.graph_stack[0]))]:
             previous_comms = base_comms
             previous_graph_id = graph_id
+            vertex_id = selected_vertices[graph_id]
             for current_graph_id in range(graph_id+direction, limit, direction):
                 
                 # Find the options and modularities for moves
@@ -334,42 +336,50 @@ class LeidenClass:
                 previous_graph_id = current_graph_id
                 
         final_option = max(final_options, key = lambda x:x.dQ)
-        if final_option.dQ > 0:
-            communities = self.communities[self._comm]
-            for graph_id in final_option.target_comms:
-                graph = graphs[graph_id]
-                vertex_id = selected_vertices[graph_id]
-                target_comm = target_comm[graph_id]
-                
-                if target_comm == -1:
-                    i = 0
-                    while True:
-                        if communities.get(i, (0, 0, 0))[0] == 0:
-                            break
-                        i += 1
-                    target_comm = i
-                
-                self.update_communities(
-                    self._comm,
-                    graph.vs[vertex_id][self._comm],
-                    target_comm,
-                    community_edges_dict[graph_id],
-                    graph.vs[vertex_id][self._multiplicity],
-                    graph.vs[vertex_id][self._selfEdges],
-                    graph.vs[vertex_id][self._degree],
-                )
-                graph.vs[vertex_id][self._comm] = target_comm
+        if final_option.dQ <= 0:
+            graphs[graph_id].vs[selected_vertices[graph_id]][self._queued] = False
+            return
+            
+        communities = self.communities[self._comm]
+        # quality_old = self.stack_quality(self._comm, self.consistency_weight)
+        for graph_id in final_option.target_comms:
+            graph = graphs[graph_id]
+            vertex_id = selected_vertices[graph_id]
+            target_comm = final_option.target_comms[graph_id]
+            
+            if target_comm == -1:
+                i = 0
+                while True:
+                    if communities.get(i, (0, 0, 0))[0] == 0:
+                        break
+                    i += 1
+                target_comm = i
+            
+            self.update_communities(
+                self._comm,
+                graph.vs[vertex_id][self._comm],
+                target_comm,
+                community_edges_dict[graph_id],
+                graph.vs[vertex_id][self._multiplicity],
+                graph.vs[vertex_id][self._selfEdges],
+                graph.vs[vertex_id][self._degree],
+            )
+            graph.vs[vertex_id][self._comm] = target_comm
 
-                for vertex in graph.neighbors(vertex_id):
-                    if (
-                        not graph.vs[vertex][self._queued]
-                        and graph.vs[vertex][self._comm] != target_comm
-                    ):
-                        graph.vs[vertex][self._queued] = True
-                        if not graph.vs[vertex[self._inQueue]]:
-                            queue.put((graph_id, vertex))
+            for vertex in graph.neighbors(vertex_id):
+                if (
+                    not graph.vs[vertex][self._queued]
+                    and graph.vs[vertex][self._comm] != target_comm
+                ):
+                    graph.vs[vertex][self._queued] = True
+                    if not graph.vs[vertex][self._inQueue]:
+                        queue.put((graph_id, vertex))
 
-                graph.vs[vertex_id][self._queued] = False
+            graph.vs[vertex_id][self._queued] = False
+        # quality_new = self.stack_quality(self._comm, self.consistency_weight)
+        # dQuality = sum(quality_new) - sum(quality_old)
+        # if dQuality < 0:
+        #     ic(dQuality)
        
     def refine(self):
         ic("refine")
@@ -386,12 +396,11 @@ class LeidenClass:
                 for vertex_id in indices:
                     if not graph.vs[vertex_id][self._queued]:
                         continue
-                    self.refineVertex(graphs, vertex_id, graph_id, kwarg)
+                    self.refineVertex(graph, vertex_id, graph_id, kwarg)
         return self
     
     def refineVertex(self, graph, vertex_id, graph_id, kwarg):
-        neighbors = graph.vs[graph.neighbors(
-            vertex_id)].select(**kwarg)
+        neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._refine]
         self_edges = graph.vs[vertex_id][self._selfEdges]
@@ -673,9 +682,9 @@ if __name__ == "__main__":
         # graph = ig.Graph.Famous("zachary")
         random.seed(i)
         graphs = [GrGen.GirvanNewmanBenchmark(
-            7, 4 * i, density=0.5) for i in range(3)]
+            7, 4 * i, density=0.8) for i in range(10)]
         random.seed(i)
-        print(leiden(graphs, "comm", 1, 0.564843))
+        print(leiden(graphs, "comm", 2, 0.8))
         # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graphs[0], "comm")
         ig.plot(cluster, "test.pdf")

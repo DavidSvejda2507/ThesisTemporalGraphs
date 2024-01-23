@@ -529,9 +529,9 @@ if __name__ == "__main__":
         # graph = ig.Graph.Famous("zachary")
         random.seed(i)
         graphs = [GrGen.GirvanNewmanBenchmark(
-            7, 4 * i, density=0.5) for i in range(3)]
+            7, 4 * i, density=0.8) for i in range(5)]
         random.seed(i)
-        print(leiden(graphs, "comm", 1, 0.564843))
+        print(leiden(graphs, "comm", 2, 0.8))
         # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graphs[0], "comm")
         ig.plot(cluster, "test.pdf")
