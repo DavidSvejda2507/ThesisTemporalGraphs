@@ -12,18 +12,28 @@ import matplotlib.pyplot as plt
 
 # fmt: off
 def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True):
+    """Performs the second version of the consistency leiden algorithm.
+
+    Args:
+        graphs (list[ig.graph]): List of graphs to be clustered.
+        attr (str): Name of the vertex attribute where the result of the clustering will be saved.
+        iterations (int): Number of iterations that the algorithms performs.
+        consistency_weight (float): Weight of the consistency relative to the modularity.
+        initialisation (string, optional): Name of vertex attribute that stores the initial communities. Defaults to None.
+        sanitise (bool, optional): Whether to renumber the output communities to 0 ... k. Defaults to True.
+
+    Returns:
+        float: Quality of the found communities.
+    """    
     alg = LeidenClass(graphs, consistency_weight)
-    # ic("start")
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
-        # ic("loop outer")
         alg.localMove()\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
             .refine()\
             .cleanCommunities(alg._refine)
         while not alg.converged:
-            # ic("loop inner")
             alg.aggregate()\
                 .localMove()\
                 .cleanCommunities(alg._comm)\
@@ -62,13 +72,29 @@ class LeidenClass:
     converged = False
 
     def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01):
+        """Make a LeidenClass object of use in the consistency leiden algorithm 2.
+
+        Args:
+            graphs (list[ig.Graph]): The sequence of graphs to cluster.
+            consistency_weight (float, optional): Weight of the consistency relative to the modularity. Defaults to 0.5.
+            gamma (float, optional): UNIMPLEMENTED Scale of modularity. Defaults to 1.
+            theta (float, optional): Parameter that affects the randomness in the refinement step. Defaults to 0.01.
+        """        
         self.graph_stack = [graphs]
         self.gamma = gamma
         self.theta = theta
         self.consistency_weight = consistency_weight
         self.counter = 0
 
-    def initialiseGraph(self, initialisation):
+    def initialiseGraph(self, initialisation=None):
+        """Prepares the graphs by storing info in attributes.
+
+        Args:
+            initialisation (string, optional): Name of the attribute storing the initialisation. Defaults to None.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
+        """        
         for graph in self.graph_stack[0]:
             m2 = 0
             if graph.is_weighted():
@@ -94,6 +120,11 @@ class LeidenClass:
         return self
 
     def initialisePartition(self, attr):
+        """Initialises the singleton partition.
+
+        Args:
+            attr (string): Name of the vertex attribute in which to store the community membership.
+        """        
         communities = {}
         i = 0
         for graph in self.graph_stack[-1]:
@@ -104,9 +135,14 @@ class LeidenClass:
                 i += 1
         communities[-1] = (0, 0, 0)
         self.communities[attr] = communities
-        return self
     
     def initialisePartitionFromAttribute(self, comm, init):
+        """Initialises a partition from an existing partition.
+
+        Args:
+            comm (string): Name of the vertex attribute in which to store the community membership.
+            init (string): Name of the vertex attribute in which the existing partition is stored.
+        """        
         communities = {}
         for i, graph in enumerate(self.graph_stack[0]):
             for v in graph.vs:
@@ -118,25 +154,31 @@ class LeidenClass:
         communities[-1] = (0,0,0)
         self.communities[comm] = communities
                 
-        
-
     def cleanCommunities(self, attr):
+        """Remove empty communities from the community dictionary.
+
+        Args:
+            attr (string): Name of community dict to clean.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
+        """        
         output = {}
-        for key in self.communities[attr]:
-            val = self.communities[attr][key]
+        communities = self.communities[attr]
+        for key in communities:
+            val = communities[key]
             if val[0] != 0:
                 output[key] = val
-            else:
-                if val[1] != 0 or val[2] != 0:
-                    raise ValueError(
-                        f"Community with {val[1]} internal edges and {val[2]} internal degree without internal vertices found"
-                    )
         output[-1] = (0, 0, 0)
         self.communities[attr] = output
         return self
 
     def localMove(self):
-        ic("localMove")
+        """Perform the local move step of the algorithm.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
+        """         
         graphs = self.graph_stack[-1]
         queue = SimpleQueue()
         length = 0
@@ -161,6 +203,16 @@ class LeidenClass:
         return self
     
     def matchToNextGraph(self, graph_id_old, graph_id_new, vertex):
+        """Matches a vertex to a vertex in another graph, where vertices with more overlap have a larger chance of being selected.
+
+        Args:
+            graph_id_old (int): Index of the graph in which the initial vertex lives.
+            graph_id_new (int): Index of the grpah in which to look for a matching vertex.
+            vertex (int): Index of the initial vertex.
+
+        Returns:
+            int: Index of the found vertex in the new graph.
+        """        
         # find the list of vertices in the base graph represented by the current vertex(es)
         vertices, = self.deAggregateVertex(graph_id_old, [vertex])
         # Trace where the vertices end up in the next graph
@@ -183,6 +235,18 @@ class LeidenClass:
         return random.choices(candidates, weights)[0]
       
     def findMoves(self, graph, vertex_id, current_graph_id, community_edges_dict):
+        """Finds all of the possible communities into which the vertex can be moved, and calculates the change in quality for each possible move, assuming only this vertex is moved.
+
+        Args:
+            graph (ig.Graph): The current graph.
+            vertex_id (int): Index of the vertex.
+            current_graph_id (int): Index of the current graph.
+            community_edges_dict (dict[int:dict]): Dictionary into which the summary of connections to adjacent communities is to be put.
+
+        Returns:
+            local_options (dict[int:tuple]): Dictionary of target communities and their corresponding changes in quality.
+            next_comms (set_list): Named tuple with sets containing the indices of the vertices in the current vertex and all communities involved in this step.
+        """        
         set_list = namedtuple("set_list", ["vertices", "old_comm", "new_comms", "set_names"],)
     
         degree = graph.vs[vertex_id][self._degree]
@@ -228,6 +292,17 @@ class LeidenClass:
         return local_options, next_comms
  
     def cross_intersect(self, vertex1, comm1, vertex2, comm2):
+        """For each pair of 1 and 2 find the intersection and then add the cross products.
+
+        Args:
+            vertex1 ((frozen)set[int]): Set of vertices in vertex 1.
+            comm1 ((frozen)set[int]): Set of vertices in community 1.
+            vertex2 ((frozen)set[int]): Set of vertices in vertex 2.
+            comm2 ((frozen)set[int]): Set of vertices in community 2.
+
+        Returns:
+            int: Cross intersection.
+        """        
         vv = len(vertex1.intersection(vertex2))
         vc = len(vertex1.intersection(comm2))
         cv = len(comm1.intersection(vertex2))
@@ -235,6 +310,16 @@ class LeidenClass:
         return vv*cc + vc*cv
            
     def calculate_interactions(self, set_list1, set_list2, normalisation_factor):
+        """Calulates the interaction between each pair of possible moves due to the consistency.
+
+        Args:
+            set_list1 (namedtuple[set,set,list[set],list[int]]): Tuple containing all of the sets of vertices involved in the moves in the first graph.
+            set_list2 (namedtuple[set,set,list[set],list[int]]): Tuple containing all of the sets of vertices involved in the moves in the second graph.
+            normalisation_factor (float): Normalisation factor based on the number of vertices in the graphs.
+
+        Returns:
+            dict[int:dict[int:float]]: Nested dictionary containing all of the interactions with the target communities as the keys of the dicts.
+        """        
         output = {}
         for key1 in set_list1.set_names:
             output[key1] = {}
@@ -260,6 +345,18 @@ class LeidenClass:
         return output
            
     def updateOptions(self, final_options, intermediate_options, local_options, interactions, graph_id):
+        """Combines the possible moves so far with the possible moves in the next graph to find new possible moves.
+
+        Args:
+            final_options (list[namedtuple]): List of the best overall moves, one for each move in the base graph.
+            intermediate_options (list[namedtuple]): List of all of the best moves for each pair of base move and move in the previous graph.
+            local_options (dict[int:tuple]): Dict of all of the moves in the current graph, whith the change in consistency.
+            interactions (dict[int:dict[int:float]]): Nested dict of interactions between moves in the previous graph and moves in the current graph.
+            graph_id (int): Index of the current graph.
+
+        Returns:
+            list[namedtuple]: List of all of the best moves for each pair of base move and move in the current graph.
+        """        
         final_option = namedtuple("final_option", ["source_target", "target_comms", "dQ"])
         option = namedtuple("option", ["target", "graph", "source_target", "target_comms", "dQ"])
         next_options = []
@@ -286,6 +383,13 @@ class LeidenClass:
         return next_options
 
     def localMoveVertex(self, graph_id, vertex_id, queue):
+        """Performs the local move step of the consistency leiden algorithm 2 for one vertex.
+
+        Args:
+            graph_id (int): Index of the current graph.
+            vertex_id (int): Index of the current vertex.
+            queue (simplequeue): Queue of vertices into which newly queued vertices can be put.
+        """        
         graphs = self.graph_stack[-1]
         graph = graphs[graph_id]
         
@@ -307,10 +411,14 @@ class LeidenClass:
         options = []
         
         for comm in local_options:
-            final_options.append(final_option(comm, {graph_id:comm}, sum(local_options[comm])))
-            options.append(option(comm, graph_id, comm, {graph_id:comm}, sum(local_options[comm])))
+            dq = sum(local_options[comm][0::2])
+            dc = sum(local_options[comm][1::2])
+            if dq>0 or dc>0:
+                final_options.append(final_option(comm, {graph_id:comm}, sum(local_options[comm])))
+                options.append(option(comm, graph_id, comm, {graph_id:comm}, sum(local_options[comm])))
+        if len(final_options) == 0:
+            return
             
-        
         for direction, limit in [(-1, -1), (1, len(self.graph_stack[0]))]:
             previous_comms = base_comms
             previous_graph_id = graph_id
@@ -341,7 +449,6 @@ class LeidenClass:
             return
             
         communities = self.communities[self._comm]
-        # quality_old = self.stack_quality(self._comm, self.consistency_weight)
         for graph_id in final_option.target_comms:
             graph = graphs[graph_id]
             vertex_id = selected_vertices[graph_id]
@@ -376,12 +483,13 @@ class LeidenClass:
                         queue.put((graph_id, vertex))
 
             graph.vs[vertex_id][self._queued] = False
-        # quality_new = self.stack_quality(self._comm, self.consistency_weight)
-        # dQuality = sum(quality_new) - sum(quality_old)
-        # if dQuality < 0:
-        #     ic(dQuality)
        
     def refine(self):
+        """Performs the refinement step of the consistency leiden algorithm 2.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
+        """        
         ic("refine")
         self.converged = True
         graphs = self.graph_stack[-1]
@@ -400,6 +508,14 @@ class LeidenClass:
         return self
     
     def refineVertex(self, graph, vertex_id, graph_id, kwarg):
+        """Performs the refinement step of the consistency leiden algorithm 2 for one vertex.
+
+        Args:
+            graph (ig.Graph): Current graph.
+            vertex_id (int): Index of current vertex.
+            graph_id (int): Index of current graph.
+            kwarg (dict): Dictionary containing the argument for the select function call that selects only members of the same community as the current vertex.
+        """        
         neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._refine]
@@ -458,6 +574,17 @@ class LeidenClass:
             self.converged = False
 
     def update_communities(self, attr, current, future, community_edges, multiplicity, self_edges, degree):
+        """Update the community dictionary to reflect the changes caused by a move.
+
+        Args:
+            attr (string): Attribute in which the move was made (self._comm or self._refine).
+            current (int): Community that the vertex is leaving.
+            future (int): Community that the vertex is joining.
+            community_edges (dict[int:int]): summary of the number of edges between the vertex and all communities.
+            multiplicity (int): Number of vertices represented by the moved vertex.
+            self_edges (int): Number of edges between vertices represented by the moved vertex.
+            degree (int): Total degree of the vertices represented by the moved vertex.
+        """        
         communities = self.communities[attr]
         old_vertexcount, old_edgecount, old_degreesum = communities[current]
         communities[current] = (
@@ -475,6 +602,14 @@ class LeidenClass:
         )
         
     def deAggregateVertex(self, graph_id, *vertices):
+        """Translate each list of vertices in the top level graph into a list of vertices in the bottom level graph.
+
+        Args:
+            graph_id (int): Index of the graph.
+
+        Returns:
+            tuple[list[int]]: For each input list a list of indices.
+        """        
         for graphs in self.graph_stack[:0:-1]:
             subvertices = graphs[graph_id].vs[self._subVertices]
             vertices = tuple(sum([subvertices[v] for v in item], start=[]) 
@@ -482,6 +617,14 @@ class LeidenClass:
         return vertices
         
     def reAggregateVertex(self, graph_id, *vertices):
+        """Translate each list of vertices in the bottom layer graph into a list of vertices in the top level graph.
+
+        Args:
+            graph_id (int): Index of the graph.
+
+        Returns:
+            tuple[list[int]]: For each input list a list of indices.
+        """        
         for graphs in self.graph_stack[:-1]:
             refineIndices = graphs[graph_id].vs[self._refineIndex]
             vertices = tuple([refineIndices[v] for v in item] 
@@ -489,6 +632,15 @@ class LeidenClass:
         return vertices
             
     def countCommunities(self, graph, attr, *vertices):
+        """Translate each list of vertices into a dictionary counting how often each community is found in those vertices.
+
+        Args:
+            graph (ig.Graph): The current graph.
+            attr (string): The vertex attribute used to get the community.
+
+        Returns:
+            list[dict]: For each input list a dict mapping communities to the number of listed vertices in that community.
+        """        
         output = []
         lookup = graph.vs[attr]
         for _list in vertices:
@@ -500,6 +652,21 @@ class LeidenClass:
         return output
 
     def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree, deaggregated_vertex = None):
+        """Calculates the changes of modularity and consistency for moving a disconnected vertex into a community.
+
+        Args:
+            attr (string): Name of the attribute under consideration (self._comm or self._refine).
+            comm (int): Target community to consider.
+            graph_id (int): Index of the current graph.
+            vertex_id (int): Index of the current vertex.
+            edges (int): Total weight of the edges between the vertex and the community.
+            degree (int): Total degree of the vertices within the current vertex.
+            deaggregated_vertex (list[int], optional): List of the base vertices represented by the current vertex. Defaults to None.
+
+        Returns:
+            tuple: change in modularity, change in consistency.
+            list[int]: list of the base vertices in the target community.
+        """        
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
@@ -534,6 +701,21 @@ class LeidenClass:
         return (dq, self.consistency_weight * dc), comm_members
 
     def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
+        """Calculates the changes of modularity and consistency for moving a disconnected vertex out of a community.
+
+        Args:
+            attr (string): Name of the attribute under consideration (self._comm or self._refine).
+            comm (int): Community being left.
+            graph_id (int): Index of the current graph.
+            vertex_id (int): Index of the current vertex.
+            edges (int): Total weight of the edges between the vertex and the community.
+            degree (int): Total degree of the vertices within the current vertex.
+
+        Returns:
+            tuple: change in modularity, change in consistency.
+            list[int]: list of the base vertices in the target community.
+            list[int]: list of the base vertices in the vertex.
+        """        
         vertexcount, edgecount, degreesum = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
@@ -565,6 +747,14 @@ class LeidenClass:
         return (dq, self.consistency_weight * dc), comm_members, vertex
 
     def graph_neigbors(self, graph_id):
+        """Lists the graphs adjacent to the current graph.
+
+        Args:
+            graph_id (int): Current graph.
+
+        Returns:
+            list[int]: Indeces of adjacent graphs.
+        """        
         output = []
         if graph_id > 0:
             output.append(graph_id - 1)
@@ -573,7 +763,12 @@ class LeidenClass:
         return output
 
     def aggregate(self):
-        new_stack = []
+        """Creates the next layer of graphs in the graph stack by aggregating vertices with the same self._refine value.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
+        """        
+        new_layer = []
         communities = self.communities[self._refine]
         for graph in self.graph_stack[-1]:
             partition = ig.VertexClustering.FromAttribute(graph, self._refine)
@@ -590,16 +785,26 @@ class LeidenClass:
             aggregate_graph.vs[self._selfEdges] = [
                 communities[v[self._refine]][1] for v in aggregate_graph.vs
             ]
-            new_stack.append(aggregate_graph)
-        self.graph_stack.append(new_stack)
+            new_layer.append(aggregate_graph)
+        self.graph_stack.append(new_layer)
         return self
 
     def deAggregate(self):
+        """Removes all added layers of graphs while preserving the self._comm attributes.
+
+        Returns:
+            LeidenComm: Self, for chaining of functions.
+        """        
         self.deAggregate_Unwind(self._comm)
         self.graph_stack = [self.graph_stack[0]]
         return self
 
     def deAggregate_Unwind(self, attr):
+        """Distributes the community membership from the top layer of graphs to the bottom layer.
+
+        Args:
+            attr (string): Name of the community membership to distribute.
+        """        
         for graphs, aggregate_graphs in zip(
             self.graph_stack[-2::-1], self.graph_stack[:0:-1]
         ):
@@ -610,6 +815,14 @@ class LeidenClass:
                 ]
 
     def renumber(self, attr):
+        """Renumbers the community membership on the bottom layer of graphs, DOESN'T UPDATE MEMBERSHIP DICT.
+
+        Args:
+            attr (string): Name of attribute to renumber.
+
+        Returns:
+            leidenClass: Self, for chaining of functions.
+        """        
         _dict = {}
         i = 0
         for graph in self.graph_stack[0]:
@@ -623,11 +836,30 @@ class LeidenClass:
         return self
 
     def stack_quality(self, attr, consistency_weight):
+        """Calculates the current quality, even if graph is still stacked.
+
+        Args:
+            attr (string): Name of community structure to calculate the quality of.
+            consistency_weight (float): Consistency weight to use.
+
+        Returns:
+            tuple[float, float]: Modularity, consistency.
+        """        
         self.deAggregate_Unwind(attr)
         return quality(self.graph_stack[0], attr, consistency_weight)
 
 
 def quality(graphs, attr, consistency_weight):
+    """Calculates the quality of a sequence of graphs.
+
+    Args:
+        graphs (list[ig.Graph]): List of graphs.
+        attr (string): Name of the attribute containing the community structure.
+        consistency_weight (float): Relative weight of the consistency.
+
+    Returns:
+        tuple[float, float]: Modularity, consistency.
+    """    
     mod_quality = 0
     for graph in graphs:
         mod_quality += graph.modularity(graph.vs[attr])
@@ -642,6 +874,14 @@ def quality(graphs, attr, consistency_weight):
 
 
 def renumber(lst):
+    """Renumbers a list from 0 to k, keeping same values the same
+
+    Args:
+        lst (list[hashable]): Input list
+
+    Returns:
+        list[int]: Renumbered list
+    """    
     dct = {}
     i = 0
     out = [None] * len(lst)
@@ -655,28 +895,7 @@ def renumber(lst):
 
 if __name__ == "__main__":
     ig.config["plotting.backend"] = "matplotlib"
-    # graphs = [1, 2, 3, 4, 5, 6]
-    # print(graphs[-2::-1])
-    # print(graphs[:0:-1])
-    # for graph, aggregate_graph in zip(graphs[-2::-1], graphs[:0:-1]):
-    #     print(graph, aggregate_graph)
 
-    # g = ig.Graph.Full(4)
-    # g.vs["comm"] = [0, 0, 1, 1]
-    # g.vs[_degree] = [3, 3, 3, 3]
-    # g.es["weight"] = [1, 1, 1, 1, 1, 1]
-    # g["m"] = 17
-    # part = ig.VertexClustering.FromAttribute(g, "comm")
-    # g2 = part.cluster_graph({None: "first", _degree: "sum"}, "sum")
-    # print(g2.summary())
-    # print(g["m"])
-    # print(g2["m"])
-    # print(g2.es.attributes())
-    # print(g2.es["weight"])
-    # print(g2.vs["comm"])
-    # print(g2.vs[_degree])
-
-    # ic.disable()
     for i in range(1):
         # graph = ig.Graph.Famous("Cubical")
         # graph = ig.Graph.Famous("zachary")
@@ -685,14 +904,5 @@ if __name__ == "__main__":
             7, 4 * i, density=0.8) for i in range(10)]
         random.seed(i)
         print(leiden(graphs, "comm", 2, 0.8))
-        # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graphs[0], "comm")
         ig.plot(cluster, "test.pdf")
-    # print(graph.vs["comm"])
-
-    # print("###########################################")
-
-    # for i in range(10):
-    #     graph = ig.Graph.Famous("zachary")
-    #     print(leidenClass(graph, "comm"))
-    # # print(graph.vs["comm"])
