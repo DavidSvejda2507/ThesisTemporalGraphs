@@ -135,18 +135,18 @@ GenerationPars = {
     "density": 0.5,
 }
 clusterers = [
-    {
-        "method": grCls.clusterVariance,
-        "ks": [1, 2, 3, 4, 5, 6, 7, 8],
-        "label": "Variance of optimal solutions",
-        "filename": "Variance1",
-    },
-    {
-        "method": grCls.clusterVariance2,
-        "ks": [1, 2, 3, 4, 5],
-        "label": "Variance of optimal solutions with depth 2",
-        "filename": "Variance2",
-    },
+    # {
+    #     "method": grCls.clusterVariance,
+    #     "ks": [1, 2, 3, 4, 5, 6, 7, 8],
+    #     "label": "Variance of optimal solutions",
+    #     "filename": "Variance1",
+    # },
+    # {
+    #     "method": grCls.clusterVariance2,
+    #     "ks": [1, 2, 3, 4, 5],
+    #     "label": "Variance of optimal solutions with depth 2",
+    #     "filename": "Variance2",
+    # },
     # {
     #     "method": grCls.clusterStacked,
     #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
@@ -177,17 +177,23 @@ clusterers = [
     #     "label": "Connected-partition",
     #     "filename": "Connected",
     # },
+    # {
+    #     "method": grCls.consistencyLeiden,
+    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+    #     "label": "Consistency Leiden partition",
+    #     "filename": "Consistency1",
+    # },
+    # {
+    #     "method": grCls.initialisedConsistencyLeiden,
+    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+    #     "label": "Initialised consistency Leiden partition",
+    #     "filename": "Consistency2",
+    # },
     {
-        "method": grCls.consistencyLeiden,
+        "method": grCls.consistencyLeiden2,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden partition",
-        "filename": "Consistency1",
-    },
-    {
-        "method": grCls.initialisedConsistencyLeiden,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Initialised consistency Leiden partition",
-        "filename": "Consistency2",
+        "label": "Consistency Leiden 2 partition",
+        "filename": "Consistency2-0",
     },
 ]
 
