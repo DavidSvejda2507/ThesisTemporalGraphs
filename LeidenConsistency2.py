@@ -124,6 +124,9 @@ class LeidenClass:
 
         Args:
             attr (string): Name of the vertex attribute in which to store the community membership.
+
+        Returns:
+            LeidenClass: Self, for chaining of functions.
         """        
         communities = {}
         i = 0
@@ -135,6 +138,7 @@ class LeidenClass:
                 i += 1
         communities[-1] = (0, 0, 0)
         self.communities[attr] = communities
+        return self
     
     def initialisePartitionFromAttribute(self, comm, init):
         """Initialises a partition from an existing partition.
