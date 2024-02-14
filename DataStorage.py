@@ -17,11 +17,17 @@ def update(filename):
         for line in data:
             file.write(f'{line["n_graphs"]}, {line["step_size"]}, {line["k_gen"]}, {line["density"]}, 0, {line["k_cluster"]}, {line["modularity"]}, {line["consistency"]}, 2\n')
             
-            
-            
 def loadData(filename):
     if not os.path.isfile(filename):
         warnings.warn(f"Failed to load file {filename} for plotting")
     with open(filename) as file:
         data = np.genfromtxt(file, dtype=(int, int, float, float, int, float, float, float, int), delimiter=",", skip_header=1, names=True)
     return data
+
+def writeData(filename, clustering_func, generator, n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations):
+    if not os.path.isfile(filename):
+        with open(filename, "a") as file:
+            file.write(f"#Results of {clustering_func.__name__} on graphs generated using {generator.__name__}\n")
+            file.write("#n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations\n")
+    with open(filename, "a") as file:
+        file.write(f"{n_graphs}, {step_size}, {k_gen}, {density}, {seed}, {k_cluster}, {modularity}, {consistency}, {iterations}\n")

@@ -4,6 +4,7 @@ import numpy as np
 import GraphGenerators as grGen
 import GraphAnalysis as grAn
 import GraphClusterers as grCls
+import DataStorage as DS
 from math import exp
 
 
@@ -93,5 +94,15 @@ def measure(filename, line):
     generator_func = [x["generator"] for x in GenerationPars if x["filename"]==order["generator"]][0]
     
     graphs = grGen.generateGraphSequence(order["seed"], order["n_graphs"], order["step_size"], generator_func, k_out = order["k_gen"], density = order["density"])
-    partition = clustering_func(graphs, order["k_cluster"])
-    
+    partitions = clustering_func(graphs, order["k_cluster"], iterations = order["iterations"])
+    mod_sum = 0
+    consistency_sum = 0
+    for i in range(order["n_graphs"]):
+        modularity = graphs[i].modularity(partitions[i])
+        # print(f"Modularity on G{i}: {modularity}")
+        mod_sum += modularity
+        if i > 0:
+            consistency_sum += grAn.Consistency(partitions[i], partitions[i - 1])
+    DS.writeData(filename, clustering_func, generator_func,
+                 modularity=mod_sum, consistency=consistency_sum,
+                 **order[2:])
