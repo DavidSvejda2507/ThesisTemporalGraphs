@@ -1,5 +1,6 @@
 import igraph as ig
 import numpy as np
+import random
 
 
 def GirvanNewmanBenchmark(k_out, offset=0, density=1):
@@ -125,42 +126,6 @@ def MergingSplitting(k_out, offset, density=1):
     G.vs["community"] = comm_vector
     print(comm_vector)
     return G
-    
-
-
-def addWeights(w1, w2):
-    if w1 is None and w2 is None:
-        raise ValueError(f"Tried to add weights {w1} and {w2}")
-    if w1 is None:
-        return w2
-    if w2 is None:
-        return w1
-    return w1 + w2
-
-
-def mergeGraphs(Graph1, Graph2):
-    if Graph1.is_weighted():
-        Graph1.es["weight_1"] = Graph1.es["weight"]
-        del Graph1.es["weight"]
-    else:
-        Graph1.es["weight_1"] = 1
-    if "weight_2" in Graph1.es.attributes():
-        del Graph1.es["weight_2"]
-
-    if Graph2.is_weighted():
-        Graph2.es["weight_2"] = Graph2.es["weight"]
-        del Graph2.es["weight"]
-    else:
-        Graph2.es["weight_2"] = 1
-    if "weight_1" in Graph2.es.attributes():
-        del Graph2.es["weight_1"]
-
-    G = ig.union([Graph1, Graph2])
-    G.es["weight"] = [
-        addWeights(weight_1, weight_2)
-        for weight_1, weight_2 in zip(G.es["weight_1"], G.es["weight_2"])
-    ]
-    return G
 
 
 def concatGraphs(graphs, weight):
@@ -188,6 +153,14 @@ def concatGraphs(graphs, weight):
     weights = [weight] * (n * (n_graphs - 1))
     G.add_edges(edges, {"weight": weights})
     return G
+
+
+def generateGraphSequence(seed_offset, n_steps, step_size, generator, filename=None, **kwargs):
+    graphs = [None] * n_steps
+    for i in range(n_steps):
+        random.seed(i + seed_offset*n_steps)
+        graphs[i] = generator(offset=i * step_size, **kwargs)
+    return graphs
 
 
 if __name__ == "__main__":

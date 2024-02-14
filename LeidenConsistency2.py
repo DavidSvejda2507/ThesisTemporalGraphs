@@ -494,7 +494,6 @@ class LeidenClass:
         Returns:
             LeidenClass: Self, for chaining of functions.
         """        
-        ic("refine")
         self.converged = True
         graphs = self.graph_stack[-1]
         communities = self.communities[self._comm]

@@ -1,26 +1,10 @@
 import numpy as np
 import os
-import igraph as ig
-import leidenalg
 import matplotlib.pyplot as plt
 import GraphGenerators as grGen
 import GraphPlotting as grPlt
 import GraphAnalysis as grAn
 import GraphClusterers as grCls
-import warnings
-import random
-from math import exp
-
-warnings.simplefilter("ignore", UserWarning)
-
-
-def generateGraphSequence(n_steps, step_size, generator, filename, **kwargs):
-    graphs = [None] * n_steps
-    for i in range(n_steps):
-        random.seed(i)
-        graphs[i] = generator(offset=i * step_size, **kwargs)
-    return graphs
-
 
 def measureClusteringMethod(graphs, clusterer, generationpars):
     clustering_func = clusterer["method"]
@@ -78,6 +62,7 @@ def measureClusteringMethod(graphs, clusterer, generationpars):
     return mods, consists
 
 
+
 def ClusterTest(GenerationPars, clusterers, title, filename):
     # Generating the graphs
     graphs = generateGraphSequence(**GenerationPars)
@@ -126,78 +111,8 @@ if n_steps > 32 * n_turns:
     raise ValueError(f"At most {32*n_turns} steps are allowed, not {n_steps}")
 step_size = 32 * n_turns // n_steps
 
-GenerationPars = {
-    "n_steps": n_steps,
-    "generator": grGen.GirvanNewmanBenchmark,
-    "filename": "GNBenchmark",
-    "step_size": step_size,
-    "k_out": k_out,
-    "density": 0.5,
-}
-clusterers = [
-    # {
-    #     "method": grCls.clusterVariance,
-    #     "ks": [1, 2, 3, 4, 5, 6, 7, 8],
-    #     "label": "Variance of optimal solutions",
-    #     "filename": "Variance1",
-    # },
-    # {
-    #     "method": grCls.clusterVariance2,
-    #     "ks": [1, 2, 3, 4, 5],
-    #     "label": "Variance of optimal solutions with depth 2",
-    #     "filename": "Variance2",
-    # },
-    # {
-    #     "method": grCls.clusterStacked,
-    #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
-    #     "label": "Merge-partition",
-    #     "filename": "Stacked",
-    # },
-    # {
-    #     "method": grCls.clusterConnected,
-    #     "ks": [
-    #         0.1,
-    #         0.05,
-    #         0.02,
-    #         0.01,
-    #         0.007,
-    #         0.005,
-    #         0.004,
-    #         0.003,
-    #         0.0025,
-    #         0.002,
-    #         0.0015,
-    #         0.001,
-    #         0.0007,
-    #         0.0005,
-    #         0.0002,
-    #         0.0001,
-    #         0,
-    #     ],
-    #     "label": "Connected-partition",
-    #     "filename": "Connected",
-    # },
-    # {
-    #     "method": grCls.consistencyLeiden,
-    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-    #     "label": "Consistency Leiden partition",
-    #     "filename": "Consistency1",
-    # },
-    # {
-    #     "method": grCls.initialisedConsistencyLeiden,
-    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-    #     "label": "Initialised consistency Leiden partition",
-    #     "filename": "Consistency2",
-    # },
-    {
-        "method": grCls.consistencyLeiden2,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 2 partition",
-        "filename": "Consistency2-0",
-    },
-]
 
-title = "Girvan and Newman benchmark with two turns in 16 steps"
+title = f"Girvan and Newman benchmark with two turns in {n_steps} steps"
 # filename = "plotGNbenchmark.pdf"
 # filename = "plotCreationDestructionBenchmark.pdf"
 filename = "test.pdf"

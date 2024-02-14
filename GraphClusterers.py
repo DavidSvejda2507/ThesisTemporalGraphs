@@ -6,7 +6,7 @@ import LeidenConsistency as LeiCons
 import LeidenConsistency2 as LeiCons2
 
 
-def clusterStacked(graphs, k):
+def clusterStacked(graphs, k, iterations = 2):
     """Cluster the graphs by stacking k graphs on top of one another and clustering each stack
 
     Args:
@@ -20,7 +20,7 @@ def clusterStacked(graphs, k):
     partitions = []
     while i < len(graphs):
         membership = leidenalg.find_partition_multiplex(
-            graphs[i : i + k], leidenalg.ModularityVertexPartition
+            graphs[i : i + k], leidenalg.ModularityVertexPartition, n_iterations=iterations
         )[0]
         i += k
         if i < len(graphs):
@@ -31,7 +31,7 @@ def clusterStacked(graphs, k):
     return partitions
 
 
-def clusterConnected(graphs, k):
+def clusterConnected(graphs, k, iterations = 2):
     """Cluster the graphs by connecting the graphs along the time axis using edges with weight k
 
     Args:
@@ -45,17 +45,17 @@ def clusterConnected(graphs, k):
         g.vs["id"] = list(range(g.vcount()))
 
     return leidenalg.find_partition_temporal(
-        graphs, leidenalg.ModularityVertexPartition, k
+        graphs, leidenalg.ModularityVertexPartition, k, n_iterations=iterations
     )[0]
 
 
 # @numba.jit(nopython=True)
-def clusterVariance(graphs, k):
+def clusterVariance(graphs, k, iterations = 2):
     clusters = [[None] * k for _ in range(len(graphs))]
     for i, graph_ in enumerate(graphs):
         for j in range(k):
             partition = leidenalg.find_partition(
-                graph_, leidenalg.ModularityVertexPartition, seed=j * 137
+                graph_, leidenalg.ModularityVertexPartition, n_iterations=iterations, seed=j * 137
             )
             clusters[i][j] = partition.membership
             del partition
@@ -85,12 +85,12 @@ def clusterVariance(graphs, k):
 
 
 # @numba.jit(nopython=True)
-def clusterVariance2(graphs, k):
+def clusterVariance2(graphs, k, iterations = 2):
     clusters = [[None] * k for _ in range(len(graphs))]
     for i, graph_ in enumerate(graphs):
         for j in range(k):
             partition = leidenalg.find_partition(
-                graph_, leidenalg.ModularityVertexPartition, seed=j * 137
+                graph_, leidenalg.ModularityVertexPartition, n_iterations=iterations, seed=j * 137
             )
             clusters[i][j] = partition.membership
             del partition
