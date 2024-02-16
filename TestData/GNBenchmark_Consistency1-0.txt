@@ -1,5 +1,5 @@
 #Results of consistencyLeiden on graphs generated using GirvanNewmanBenchmark
-#n_graphs, step_size, k_gen, density, k_cluster, modularity, consistency
+n_graphs, step_size, k_gen, density, k_cluster, modularity, consistency
 32, 2, 7, 0.5, 0, 0.3492494919032337, 0.7461622110744222
 32, 2, 7, 0.5, 0.035673993347252395, 0.3468498304226325, 0.767740347980696
 32, 2, 7, 0.5, 0.049787068367863944, 0.3460283052811073, 0.778971932943866

@@ -63,14 +63,16 @@ clusterers = [
         "method": grCls.consistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden partition",
-        "filename": "Consistency1",
+        "filename": "Consistency1-0",
     },
     {
         "method": grCls.initialisedConsistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Initialised consistency Leiden partition",
-        "filename": "Consistency2",
+        "filename": "Consistency1-1",
     },
+]
+initialisable_clusterers = [
     {
         "method": grCls.consistencyLeiden2,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
@@ -80,7 +82,7 @@ clusterers = [
 ]
 
 
-def measure(filename, line):
+def measure(filename, line, initialisable = True):
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"file '{filename}' not found")
     with open(filename) as file:
@@ -94,15 +96,53 @@ def measure(filename, line):
     generator_func = [x["generator"] for x in GenerationPars if x["filename"]==order["generator"]][0]
     
     graphs = grGen.generateGraphSequence(order["seed"], order["n_graphs"], order["step_size"], generator_func, k_out = order["k_gen"], density = order["density"])
-    partitions = clustering_func(graphs, order["k_cluster"], iterations = order["iterations"])
-    mod_sum = 0
-    consistency_sum = 0
-    for i in range(order["n_graphs"]):
-        modularity = graphs[i].modularity(partitions[i])
-        # print(f"Modularity on G{i}: {modularity}")
-        mod_sum += modularity
-        if i > 0:
-            consistency_sum += grAn.Consistency(partitions[i], partitions[i - 1])
-    DS.writeData(filename, clustering_func, generator_func,
-                 modularity=mod_sum, consistency=consistency_sum,
-                 **order[2:])
+    if initialisable:
+        partitions = clustering_func(graphs, order["k_cluster"], iterations = 1)
+        iterations = 1
+    else:
+        partitions = clustering_func(graphs, order["k_cluster"], iterations = order["iterations"])
+        iterations = order["iterations"]
+    mod_sum, consistency_sum = grAn.evaluatePartitions(graphs, partitions)
+            
+    DS.maybeWriteData(filename, clustering_func, generator_func,
+                 modularity=mod_sum, consistency=consistency_sum, iterations=iterations,
+                 **order[2:-1])
+    if initialisable:
+        while iterations < order["iterations"]:
+            partitions = clustering_func(graphs, order["k_cluster"], iterations = 1, initialisation = "comm")
+            iterations += 1
+            mod_sum, consistency_sum = grAn.evaluatePartitions(graphs, partitions)
+            DS.maybeWriteData(filename, clustering_func, generator_func,
+                        modularity=mod_sum, consistency=consistency_sum, iterations=iterations,
+                        **order[2:-1])
+            
+
+def generateOrders(filename, seeds, initialisable = False):
+    with open(filename, "w") as file:
+        for gen_par in GenerationPars:
+            if initialisable: cluster_list = initialisable_clusterers
+            else: cluster_list = clusterers
+            for clusterer in cluster_list:
+                filename = "TestData/" + gen_par["filename"] + "_" + clusterer["filename"] + ".txt"
+                data = DS.loadData(filename)
+                if data is None: data = []
+                mask = [x["n_graphs"]==gen_par["n_steps"] and x["step_size"]==gen_par["step_size"] and x["k_gen"]==gen_par["k_out"] and 
+                        x["density"]==gen_par["density"] and x["iterations"]<=clusterer["iterations"] for x in data]
+                data = data[mask]
+                for k in clusterer["ks"]:
+                    mask1 = [x["k_cluster"] == k for x in data]
+                    for s in range(seeds):
+                        mask2 = [x["seed"] == s for x in data[mask1]]
+                        if initialisable:
+                            for i in range(clusterers["iterations"],0):
+                                mask3 = [x["iterations"] == i for x in data[mask1][mask2]]
+                                if not any(mask3):
+                                    file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i}\n")
+                                    break
+                        else:
+                            for i in range(clusterers["iterations"]):
+                                mask3 = [x["iterations"] == i+1 for x in data[mask1][mask2]]
+                                if not any(mask3):
+                                    file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i+1}\n")
+                                           
+    

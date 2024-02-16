@@ -136,7 +136,7 @@ def initialisedConsistencyLeiden(graphs, k, iterations = 2):
 
     return [graph.vs["comm"] for graph in graphs]
 
-def consistencyLeiden2(graphs, k, iterations = 2):
-    LeiCons2.leiden(graphs, "comm", iterations, k)
+def consistencyLeiden2(graphs, k, iterations = 2, initialisation = None):
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation)
     
     return [graph.vs["comm"] for graph in graphs]

@@ -100,3 +100,14 @@ def ConsistencyCheck(partition1, partition2):
             if partition1[i] != partition1[j] and partition2[i] == partition2[j]:
                 sum += 1
     return 1 - 2 * sum / (vs * (vs - 1))
+
+def evaluatePartitions(graphs, partitions):
+    mod_sum = 0
+    cons_sum = 0
+    for i in len(graphs):
+        modularity = graphs[i].modularity(partitions[i])
+        # print(f"Modularity on G{i}: {modularity}")
+        mod_sum += modularity
+        if i > 0:
+            cons_sum += Consistency(partitions[i], partitions[i - 1])
+    return mod_sum, cons_sum

@@ -1,5 +1,5 @@
 #Results of clusterVariance2 on graphs generated using GirvanNewmanBenchmark
-#n_graphs, step_size, k_gen, density, k_cluster, modularity, consistency
+n_graphs, step_size, k_gen, density, k_cluster, modularity, consistency
 32, 2, 7, 0.5, 1, 0.3517951708840004, 0.7551196977393955
 32, 2, 7, 0.5, 2, 0.3514021309587301, 0.7498491871983743
 32, 2, 7, 0.5, 3, 0.3505778211029553, 0.7443762700025398
