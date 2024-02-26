@@ -80,6 +80,7 @@ initialisable_clusterers = [
         "filename": "Consistency2-0",
     },
 ]
+plottable_clusterers = clusterers + initialisable_clusterers
 
 
 def measure(filename, line, initialisable = True):

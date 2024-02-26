@@ -15,15 +15,22 @@ def update(filename):
     try:
         with open(filename, 'r') as file:
             header = file.readline()
-            data = np.genfromtxt(file, dtype=(int, int, float, float, float, float, float), delimiter=",", skip_header=0, names=True)
+            data = np.genfromtxt(file, dtype=(int, int, float, float, float, float, float), delimiter=",", skip_header=0, names=True,)
+        data["n_graphs"]
+        data["step_size"]
+        data["k_gen"]
+        data["density"]
+        data["k_cluster"]
+        data["modularity"]
+        data["consistency"]
+    except ValueError:
+        return
         
-        with open(filename, 'w') as file:
-            file.write(header)
-            file.write("n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations\n")
-            for line in data:
-                file.write(f'{line["n_graphs"]}, {line["step_size"]}, {line["k_gen"]}, {line["density"]}, 0, {line["k_cluster"]}, {line["modularity"]}, {line["consistency"]}, 2\n')
-    except(ValueError):
-        pass
+    with open(filename, 'w') as file:
+        file.write(header)
+        file.write("n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations\n")
+        for line in data:
+            file.write(f'{line["n_graphs"]}, {line["step_size"]}, {line["k_gen"]}, {line["density"]}, 0, {line["k_cluster"]}, {line["modularity"]}, {line["consistency"]}, 2\n')
             
 def loadData(filename):
     if not os.path.isfile(filename):
@@ -55,3 +62,7 @@ def maybeWriteData(filename, clustering_func, generator, n_graphs, step_size, k_
         ]): return
     writeData(filename, clustering_func, generator, n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations)
     
+if __name__ == "__main__":
+    dirrectory = "TestData/"
+    for file in os.listdir(dirrectory):
+        update(dirrectory+file)

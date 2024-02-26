@@ -89,15 +89,15 @@ def loadClusteringMethod(clusterer, generationpars):
         for row in data:
             if row["k_cluster"]==k:
                 mod_sum += row["modularity"]
-                consistencies += row["consistency"]
+                consistency_sum += row["consistency"]
                 n += 1
         if n > 0:
             modularities.append(mod_sum/n)
             consistencies.append(consistency_sum/n)
         else:
-            warnings.warn(f"Failed to find entry with k = {k} in {filename} with n_graphs = {generationpars['n_steps']} and
+            warnings.warn(f"""Failed to find entry with k = {k} in {filename} with n_graphs = {generationpars['n_steps']} and
 step_size = {generationpars['step_size']} and k_gen = {generationpars['k_out']} and 
-density = {generationpars['density']} and iterations = {clusterer['iterations']}")
+density = {generationpars['density']} and iterations = {clusterer['iterations']}""")
             
     # Interpolating between the different sollutions
     previous = None
@@ -111,9 +111,9 @@ density = {generationpars['density']} and iterations = {clusterer['iterations']}
         previous = (modularity, consistency)
     return mods, consists
     
-def PlotTestResults(GenerationPars, clusterers, title, filename):
+def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterations=2):
     # Generating the graphs
-    graphs = grGen.generateGraphSequence(**GenerationPars)
+    graphs = grGen.generateGraphSequence(**GenerationPars, seed_offset=seed)
     # Refference point
     mod_sum = 0
     consistency_sum = 0
@@ -132,6 +132,7 @@ def PlotTestResults(GenerationPars, clusterers, title, filename):
     # Plotting
     fig, ax = plt.subplots(1, 1)
     for clusterer in clusterers:
+        clusterer["iterations"] =  iterations
         mods, consists = loadClusteringMethod(clusterer, GenerationPars)
         ax.plot(consists, mods, "o-", label=clusterer["label"], markevery = 2)
     ax.plot(
@@ -149,7 +150,12 @@ def PlotTestResults(GenerationPars, clusterers, title, filename):
     fig.savefig(filename)
     
 if __name__ == "__main__":
-    import GraphGenerators as GrGen
-    graphs = [GrGen.GirvanNewmanBenchmark(6, i, 1) for i in range(5)]
-    PlotGraphseries(graphs, "community")
-    input("Press return to end\n")
+    # import GraphGenerators as GrGen
+    # graphs = [GrGen.GirvanNewmanBenchmark(6, i, 1) for i in range(5)]
+    # PlotGraphseries(graphs, "community")
+    # input("Press return to end\n")
+    
+    import GraphMeasuring as GrMeas
+    gen_pars = GrMeas.GenerationPars
+    title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
+    PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, "test.pdf")
