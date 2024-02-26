@@ -1,4 +1,5 @@
 import os
+import argparse as ap
 import numpy as np
 
 import GraphGenerators as grGen
@@ -8,32 +9,37 @@ import DataStorage as DS
 from math import exp
 
 
-GenerationPars = {
-    "n_steps": 32,
-    "generator": grGen.GirvanNewmanBenchmark,
-    "filename": "GNBenchmark",
-    "step_size": 2,
-    "k_out": 7,
-    "density": 0.5,
-}
+GenerationPars = [
+    {
+        "n_steps": 32,
+        "generator": grGen.GirvanNewmanBenchmark,
+        "filename": "GNBenchmark",
+        "step_size": 2,
+        "k_out": 7,
+        "density": 0.5,
+    },
+]
 clusterers = [
     {
         "method": grCls.clusterVariance,
         "ks": [1, 2, 3, 4, 5, 6, 7, 8],
         "label": "Variance of optimal solutions",
         "filename": "Variance1",
+        "iterations": 2
     },
     {
         "method": grCls.clusterVariance2,
         "ks": [1, 2, 3, 4, 5],
         "label": "Variance of optimal solutions with depth 2",
         "filename": "Variance2",
+        "iterations": 2
     },
     {
         "method": grCls.clusterStacked,
         "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
         "label": "Merge-partition",
         "filename": "Stacked",
+        "iterations": 3
     },
     {
         "method": grCls.clusterConnected,
@@ -58,18 +64,21 @@ clusterers = [
         ],
         "label": "Connected-partition",
         "filename": "Connected",
+        "iterations": 5
     },
     {
         "method": grCls.consistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden partition",
         "filename": "Consistency1-0",
+        "iterations": 5
     },
     {
         "method": grCls.initialisedConsistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Initialised consistency Leiden partition",
         "filename": "Consistency1-1",
+        "iterations": 5
     },
 ]
 initialisable_clusterers = [
@@ -78,6 +87,7 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden 2 partition",
         "filename": "Consistency2-0",
+        "iterations": 8
     },
 ]
 plottable_clusterers = clusterers + initialisable_clusterers
@@ -124,8 +134,8 @@ def generateOrders(filename, seeds, initialisable = False):
             if initialisable: cluster_list = initialisable_clusterers
             else: cluster_list = clusterers
             for clusterer in cluster_list:
-                filename = "TestData/" + gen_par["filename"] + "_" + clusterer["filename"] + ".txt"
-                data = DS.loadData(filename)
+                _filename = "TestData/" + gen_par["filename"] + "_" + clusterer["filename"] + ".txt"
+                data = DS.loadData(_filename)
                 if data is None: data = []
                 mask = [x["n_graphs"]==gen_par["n_steps"] and x["step_size"]==gen_par["step_size"] and x["k_gen"]==gen_par["k_out"] and 
                         x["density"]==gen_par["density"] and x["iterations"]<=clusterer["iterations"] for x in data]
@@ -135,15 +145,25 @@ def generateOrders(filename, seeds, initialisable = False):
                     for s in range(seeds):
                         mask2 = [x["seed"] == s for x in data[mask1]]
                         if initialisable:
-                            for i in range(clusterers["iterations"],0):
-                                mask3 = [x["iterations"] == i for x in data[mask1][mask2]]
-                                if not any(mask3):
-                                    file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i}\n")
-                                    break
+                            i = clusterer["iterations"]
+                            mask3 = [x["iterations"] == i for x in data[mask1][mask2]]
+                            if not any(mask3):
+                                file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i}\n")
                         else:
-                            for i in range(clusterers["iterations"]):
+                            for i in range(clusterer["iterations"]):
                                 mask3 = [x["iterations"] == i+1 for x in data[mask1][mask2]]
                                 if not any(mask3):
                                     file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i+1}\n")
                                            
     
+if __name__ == "__main__":
+    # generateOrders("orders_false.txt", 3, False)
+    # generateOrders("orders_true.txt", 3, True)
+    
+    parser = ap.ArgumentParser()
+    parser.add_argument("-i", action = "store_true")
+    parser.add_argument("fname", type=str)
+    parser.add_argument("n", type=int)
+    args = parser.parse_args()
+    
+    measure(args.fname, args.n, args.i)
