@@ -96,15 +96,14 @@ plottable_clusterers = clusterers + initialisable_clusterers
 def measure(filename, line, initialisable = True):
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"file '{filename}' not found")
-    with open(filename) as file:
-        orders = np.genfromtxt(file, dtype=(str, str, int, int, float, float, int, float, int),
-                               delimiter=",", skip_header=1, 
-                               names=["generator", "clusterer", "n_graphs", "step_size", "k_gen", "density", "seed", "k_cluster", "iterations"])
-    order = orders[line]
+    orders = np.genfromtxt(filename, dtype=None,
+                            delimiter=",", skip_header=line, max_rows=1, autostrip=True, encoding=None,
+                            names=["generator", "clusterer", "n_graphs", "step_size", "k_gen", "density", "seed", "k_cluster", "iterations"])
+    order = np.reshape(orders, (1,))[0]
     # Order: "#generator, clusterer, n_graphs, step_size, k_gen, density, seed, k_cluster, iterations\n"
-    filename = "TestData/" + order["generator"] + "_" + order["clusterer"] + ".txt"
-    clustering_func = [x["method"] for x in clusterers if x["filename"]==order["clusterer"]][0]
-    generator_func = [x["generator"] for x in GenerationPars if x["filename"]==order["generator"]][0]
+    filename = "TestData/" + str(order["generator"]) + "_" + str(order["clusterer"]) + ".txt"
+    clustering_func = [x["method"] for x in clusterers if x["filename"]==str(order["clusterer"])][0]
+    generator_func = [x["generator"] for x in GenerationPars if x["filename"]==str(order["generator"])][0]
     
     graphs = grGen.generateGraphSequence(order["seed"], order["n_graphs"], order["step_size"], generator_func, k_out = order["k_gen"], density = order["density"])
     if initialisable:

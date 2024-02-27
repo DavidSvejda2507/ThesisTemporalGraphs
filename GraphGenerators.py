@@ -158,7 +158,7 @@ def concatGraphs(graphs, weight):
 def generateGraphSequence(seed_offset, n_steps, step_size, generator, filename=None, **kwargs):
     graphs = [None] * n_steps
     for i in range(n_steps):
-        random.seed(i + seed_offset*n_steps)
+        random.seed(int(i + seed_offset*n_steps))
         graphs[i] = generator(offset=i * step_size, **kwargs)
     return graphs
 

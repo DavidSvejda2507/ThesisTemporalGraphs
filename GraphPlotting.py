@@ -156,6 +156,6 @@ if __name__ == "__main__":
     # input("Press return to end\n")
     
     import GraphMeasuring as GrMeas
-    gen_pars = GrMeas.GenerationPars
+    gen_pars = GrMeas.GenerationPars[0]
     title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
     PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, "test.pdf")
