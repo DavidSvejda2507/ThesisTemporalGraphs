@@ -100,23 +100,25 @@ def measure(filename, line, initialisable = True):
                             delimiter=",", skip_header=line, max_rows=1, autostrip=True, encoding=None,
                             names=["generator", "clusterer", "n_graphs", "step_size", "k_gen", "density", "seed", "k_cluster", "iterations"])
     order = np.reshape(orders, (1,))[0]
+
     # Order: "#generator, clusterer, n_graphs, step_size, k_gen, density, seed, k_cluster, iterations\n"
     filename = "TestData/" + str(order["generator"]) + "_" + str(order["clusterer"]) + ".txt"
-    clustering_func = [x["method"] for x in clusterers if x["filename"]==str(order["clusterer"])][0]
+    if initialisable:
+        iterations = 1
+        clustering_func = [x["method"] for x in initialisable_clusterers if x["filename"]==str(order["clusterer"])][0]
+    else:
+        iterations = order["iterations"]
+        clustering_func = [x["method"] for x in clusterers if x["filename"]==str(order["clusterer"])][0]
     generator_func = [x["generator"] for x in GenerationPars if x["filename"]==str(order["generator"])][0]
     
     graphs = grGen.generateGraphSequence(order["seed"], order["n_graphs"], order["step_size"], generator_func, k_out = order["k_gen"], density = order["density"])
-    if initialisable:
-        partitions = clustering_func(graphs, order["k_cluster"], iterations = 1)
-        iterations = 1
-    else:
-        partitions = clustering_func(graphs, order["k_cluster"], iterations = order["iterations"])
-        iterations = order["iterations"]
+    partitions = clustering_func(graphs, order["k_cluster"], iterations = iterations)
     mod_sum, consistency_sum = grAn.evaluatePartitions(graphs, partitions)
+    order_dict = dict(zip(["n_graphs", "step_size", "k_gen", "density", "seed", "k_cluster"], list(order)[2:-1]))
             
     DS.maybeWriteData(filename, clustering_func, generator_func,
                  modularity=mod_sum, consistency=consistency_sum, iterations=iterations,
-                 **order[2:-1])
+                 **order_dict)
     if initialisable:
         while iterations < order["iterations"]:
             partitions = clustering_func(graphs, order["k_cluster"], iterations = 1, initialisation = "comm")
@@ -124,7 +126,7 @@ def measure(filename, line, initialisable = True):
             mod_sum, consistency_sum = grAn.evaluatePartitions(graphs, partitions)
             DS.maybeWriteData(filename, clustering_func, generator_func,
                         modularity=mod_sum, consistency=consistency_sum, iterations=iterations,
-                        **order[2:-1])
+                        **order_dict)
             
 
 def generateOrders(filename, seeds, initialisable = False):

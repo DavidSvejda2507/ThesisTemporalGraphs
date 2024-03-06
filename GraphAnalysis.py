@@ -104,7 +104,7 @@ def ConsistencyCheck(partition1, partition2):
 def evaluatePartitions(graphs, partitions):
     mod_sum = 0
     cons_sum = 0
-    for i in len(graphs):
+    for i in range(len(graphs)):
         modularity = graphs[i].modularity(partitions[i])
         # print(f"Modularity on G{i}: {modularity}")
         mod_sum += modularity
