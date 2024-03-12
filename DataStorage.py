@@ -56,6 +56,8 @@ def loadData(filename):
         return np.zeros((0,))
     with open(filename, 'r') as file:
         data = np.genfromtxt(file, dtype=(int, int, float, float, int, float, float, float, int), delimiter=",", skip_header=1, names=True)
+    if len(np.shape(data)) == 0:
+        return np.zeros((0,))
     return data
 
 def writeData(filename, clustering_func, generator, n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations):
