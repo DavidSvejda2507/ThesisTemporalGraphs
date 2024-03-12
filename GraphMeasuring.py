@@ -153,7 +153,6 @@ def generateOrders(filename, seeds, initialisable = False):
             for clusterer in cluster_list:
                 _filename = "TestData/" + gen_par["filename"] + "_" + clusterer["filename"] + ".txt"
                 data = DS.loadData(_filename)
-                if data is None: data = np.zeros((0))
                 mask = [x["n_graphs"]==gen_par["n_steps"] and x["step_size"]==gen_par["step_size"] and x["k_gen"]==gen_par["k_out"] and 
                         x["density"]==gen_par["density"] and x["iterations"]<=clusterer["iterations"] for x in data]
                 data = data[mask]
