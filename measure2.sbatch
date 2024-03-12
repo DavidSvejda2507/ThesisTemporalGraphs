@@ -17,7 +17,7 @@
 # $ sbatch --cpus-per-task=32 --time=02:00:00 hello.sbatch
 
 #SBATCH --job-name="order_true"
-#SBATCH --array=0-50
+#SBATCH --array=0-102
 #SBATCH --partition=defq
 #SBATCH --time=0-12:00:00
 #SBATCH --nodes=1

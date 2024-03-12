@@ -31,7 +31,25 @@ def update(filename):
         file.write("n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations\n")
         for line in data:
             file.write(f'{line["n_graphs"]}, {line["step_size"]}, {line["k_gen"]}, {line["density"]}, 0, {line["k_cluster"]}, {line["modularity"]}, {line["consistency"]}, 2\n')
-            
+
+def fixLackOfScaling(filename, predicate):
+    if not os.path.isfile(filename):
+        warnings.warn(f"Failed to load file {filename}")
+        return
+    data = loadData(filename)
+    with open(filename) as file:
+        func, gen = file.readline().split(" ")[2::5]
+    os.remove(filename)
+    for line in data:
+        if predicate(line):
+            dir = dict(zip(["n_graphs", "step_size", "k_gen", "density", "seed", "k_cluster", "modularity", "consistency", "iterations"], list(line)))
+            dir["modularity"] /= dir["n_graphs"]
+            dir["consistency"] /= dir["n_graphs"]-1
+            writeData(filename, func, gen, **dir)
+        else:
+            writeData(filename, func, gen, *line)
+            pass
+
 def loadData(filename):
     if not os.path.isfile(filename):
         warnings.warn(f"Failed to load file {filename}")
@@ -43,11 +61,12 @@ def loadData(filename):
 def writeData(filename, clustering_func, generator, n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations):
     if not os.path.isfile(filename):
         with open(filename, "a") as file:
+            # file.write(f"Results of {clustering_func} on graphs generated using {generator}\n")
             file.write(f"Results of {clustering_func.__name__} on graphs generated using {generator.__name__}\n")
             file.write("n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations\n")
     with open(filename, "a") as file:
         file.write(f"{n_graphs}, {step_size}, {k_gen}, {density}, {seed}, {k_cluster}, {modularity}, {consistency}, {iterations}\n")
-        
+        pass
 def maybeWriteData(filename, clustering_func, generator, n_graphs, step_size, k_gen, density, seed, k_cluster, modularity, consistency, iterations):
     data = loadData(filename)
     for l in data:
@@ -64,5 +83,5 @@ def maybeWriteData(filename, clustering_func, generator, n_graphs, step_size, k_
     
 if __name__ == "__main__":
     dirrectory = "TestData/"
-    for file in os.listdir(dirrectory):
-        update(dirrectory+file)
+    # for file in os.listdir(dirrectory):
+        # fixLackOfScaling(dirrectory+file, lambda x: x["modularity"] + x["consistency"] > 2)

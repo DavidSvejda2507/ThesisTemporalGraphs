@@ -18,6 +18,22 @@ GenerationPars = [
         "k_out": 7,
         "density": 0.5,
     },
+    {
+        "n_steps": 32,
+        "generator": grGen.TestCreationDestruction,
+        "filename": "CreateDestructt",
+        "step_size": 2,
+        "k_out": 7,
+        "density": 0.5,
+    },
+    {
+        "n_steps": 32,
+        "generator": grGen.MergingSplitting,
+        "filename": "MergeSplit",
+        "step_size": 2,
+        "k_out": 7,
+        "density": 0.5,
+    },
 ]
 clusterers = [
     {
@@ -137,7 +153,7 @@ def generateOrders(filename, seeds, initialisable = False):
             for clusterer in cluster_list:
                 _filename = "TestData/" + gen_par["filename"] + "_" + clusterer["filename"] + ".txt"
                 data = DS.loadData(_filename)
-                if data is None: data = []
+                if data is None: data = np.zeros((0))
                 mask = [x["n_graphs"]==gen_par["n_steps"] and x["step_size"]==gen_par["step_size"] and x["k_gen"]==gen_par["k_out"] and 
                         x["density"]==gen_par["density"] and x["iterations"]<=clusterer["iterations"] for x in data]
                 data = data[mask]
@@ -158,13 +174,17 @@ def generateOrders(filename, seeds, initialisable = False):
                                            
     
 if __name__ == "__main__":
-    # generateOrders("orders_false.txt", 3, False)
-    # generateOrders("orders_true.txt", 3, True)
+    generateOrders("orders_false.txt", 3, False)
+    generateOrders("orders_true.txt", 3, True)
     
-    parser = ap.ArgumentParser()
-    parser.add_argument("-i", action = "store_true")
-    parser.add_argument("fname", type=str)
-    parser.add_argument("n", type=int)
-    args = parser.parse_args()
+    # parser = ap.ArgumentParser()
+    # parser.add_argument("-i", action = "store_true")
+    # parser.add_argument("fname", type=str)
+    # parser.add_argument("n", type=int)
+    # args = parser.parse_args()
     
-    measure(args.fname, args.n, args.i)
+    # measure(args.fname, args.n, args.i)
+        
+    # gp = GenerationPars[2]
+    # grGen.generateGraphSequence(0, **gp)
+    

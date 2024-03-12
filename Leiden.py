@@ -21,32 +21,22 @@ theta = 0.01
 
 
 def leiden(graph, attr, iterations):
-    # ic("start")
     initialiseGraph(graph)
     communities = initialisePartition(graph, _comm)
-    # ic(graph.vs[_comm])
-    # input()
 
     for _ in range(iterations):
-        # ic("loop outer")
         localMove(graph, communities)
-        # ic(graph.vs[_comm])
-        # input()
         communities = cleanCommunities(communities)
 
         refine_communities = initialisePartition(graph, _refine)
         converged = refine(graph, communities, refine_communities)
-        # ic(graph.vs[_refine])
-        # input()
         refine_communities = cleanCommunities(refine_communities)
 
         graphs = [graph]
 
         while not converged:
-            # ic("loop inner")
-            _graph = aggregate(graph, refine_communities)
-            graphs.append(_graph)
-            graph = _graph
+            graph = aggregate(graph, refine_communities)
+            graphs.append(graph)
 
             localMove(graph, communities)
             communities = cleanCommunities(communities)

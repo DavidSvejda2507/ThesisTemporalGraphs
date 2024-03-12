@@ -110,4 +110,4 @@ def evaluatePartitions(graphs, partitions):
         mod_sum += modularity
         if i > 0:
             cons_sum += Consistency(partitions[i], partitions[i - 1])
-    return mod_sum, cons_sum
+    return mod_sum/len(graphs), cons_sum/(len(graphs)-1)

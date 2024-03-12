@@ -12,17 +12,14 @@ import matplotlib.pyplot as plt
 # fmt: off
 def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True):
     alg = LeidenClass(graphs, consistency_weight)
-    # ic("start")
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
-        # ic("loop outer")
         alg.localMove(alg._comm)\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
             .refine(alg._comm, alg._refine)\
             .cleanCommunities(alg._refine)
         while not alg.converged:
-            # ic("loop inner")
             alg.aggregate()\
                 .localMove(alg._comm)\
                 .cleanCommunities(alg._comm)\
@@ -133,7 +130,6 @@ class LeidenClass:
         return self
 
     def localMove(self, attr):
-        ic("localMove")
         graphs = self.graph_stack[-1]
         communities = self.communities[attr]
         queue = SimpleQueue()
@@ -226,7 +222,6 @@ class LeidenClass:
         return self
 
     def refine(self, attr, refine_attr):
-        ic("refine")
         self.converged = True
         graphs = self.graph_stack[-1]
         communities = self.communities[attr]

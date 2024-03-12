@@ -124,7 +124,6 @@ def MergingSplitting(k_out, offset, density=1):
         comm_vector += [comm] * length
 
     G.vs["community"] = comm_vector
-    print(comm_vector)
     return G
 
 
