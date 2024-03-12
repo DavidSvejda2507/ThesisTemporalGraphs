@@ -53,7 +53,7 @@ def fixLackOfScaling(filename, predicate):
 def loadData(filename):
     if not os.path.isfile(filename):
         warnings.warn(f"Failed to load file {filename}")
-        return None
+        return np.zeros((0,))
     with open(filename, 'r') as file:
         data = np.genfromtxt(file, dtype=(int, int, float, float, int, float, float, float, int), delimiter=",", skip_header=1, names=True)
     return data
