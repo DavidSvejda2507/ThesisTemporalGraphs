@@ -174,16 +174,16 @@ def generateOrders(filename, seeds, initialisable = False):
                                            
     
 if __name__ == "__main__":
-    generateOrders("orders_false.txt", 3, False)
-    generateOrders("orders_true.txt", 3, True)
+    # generateOrders("orders_false.txt", 3, False)
+    # generateOrders("orders_true.txt", 3, True)
     
-    # parser = ap.ArgumentParser()
-    # parser.add_argument("-i", action = "store_true")
-    # parser.add_argument("fname", type=str)
-    # parser.add_argument("n", type=int)
-    # args = parser.parse_args()
+    parser = ap.ArgumentParser()
+    parser.add_argument("-i", action = "store_true")
+    parser.add_argument("fname", type=str)
+    parser.add_argument("n", type=int)
+    args = parser.parse_args()
     
-    # measure(args.fname, args.n, args.i)
+    measure(args.fname, args.n, args.i)
         
     # gp = GenerationPars[2]
     # grGen.generateGraphSequence(0, **gp)
