@@ -26,7 +26,7 @@
 #SBATCH --output=%j-%x-stdout.txt
 #SBATCH --error=%j-%x-stderr.txt
 
-python3 GraphMeasuring.py -i orders_true.txt $SLURM_ARRAY_TASK_ID
+python3 GraphMeasuring.py c -i orders_true.txt $SLURM_ARRAY_TASK_ID
 
 
 exit 0

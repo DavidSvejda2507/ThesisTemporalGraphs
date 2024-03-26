@@ -141,8 +141,8 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterati
         "ro",
         label="'True' community structure",
     )
-    ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.1)
-    ax.set_xlim(left=0, right=ax.get_xlim()[1] * 1.1)
+    # ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.1)
+    # ax.set_xlim(left=0, right=ax.get_xlim()[1] * 1.1)
     ax.set_ylabel("Average modularity")
     ax.set_xlabel("Average consistency")
     ax.legend()
@@ -156,6 +156,6 @@ if __name__ == "__main__":
     # input("Press return to end\n")
     
     import GraphMeasuring as GrMeas
-    gen_pars = GrMeas.GenerationPars[0]
-    title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
-    PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, "test.pdf")
+    for gen_pars in GrMeas.GenerationPars:
+        title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
+        PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, f"test_{gen_pars['filename']}.pdf")

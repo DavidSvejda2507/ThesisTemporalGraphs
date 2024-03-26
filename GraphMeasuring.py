@@ -96,6 +96,20 @@ clusterers = [
         "filename": "Consistency1-1",
         "iterations": 5
     },
+    {
+        "method": grCls.consistencyLeiden3,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 3 partition",
+        "filename": "Consistency3-0",
+        "iterations": 5
+    },
+    {
+        "method": grCls.initialisedConsistencyLeiden3,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Initialised consistency Leiden 3 partition",
+        "filename": "Consistency3-1",
+        "iterations": 5
+    },
 ]
 initialisable_clusterers = [
     {
@@ -103,6 +117,13 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden 2 partition",
         "filename": "Consistency2-0",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden4,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 4 partition",
+        "filename": "Consistency4-0",
         "iterations": 8
     },
 ]
@@ -173,16 +194,26 @@ def generateOrders(filename, seeds, initialisable = False):
                                            
     
 if __name__ == "__main__":
-    # generateOrders("orders_false.txt", 3, False)
-    # generateOrders("orders_true.txt", 3, True)
     
     parser = ap.ArgumentParser()
-    parser.add_argument("-i", action = "store_true")
-    parser.add_argument("fname", type=str)
-    parser.add_argument("n", type=int)
+    subparsers = parser.add_subparsers(required=True)
+    
+    generate = subparsers.add_parser("g")
+    generate.set_defaults(gen = True)
+    
+    calculate = subparsers.add_parser("c")
+    calculate.set_defaults(gen = False)
+    calculate.add_argument("-i", action = "store_true")
+    calculate.add_argument("fname", type=str)
+    calculate.add_argument("n", type=int)
+    
     args = parser.parse_args()
     
-    measure(args.fname, args.n, args.i)
+    if args.gen:
+        generateOrders("orders_false.txt", 3, False)
+        generateOrders("orders_true.txt", 3, True)
+    else:
+        measure(args.fname, args.n, args.i)
         
     # gp = GenerationPars[2]
     # grGen.generateGraphSequence(0, **gp)
