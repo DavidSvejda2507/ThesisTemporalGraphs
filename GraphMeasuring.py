@@ -198,20 +198,21 @@ if __name__ == "__main__":
     parser = ap.ArgumentParser()
     subparsers = parser.add_subparsers(required=True)
     
-    generate = subparsers.add_parser("g")
+    generate = subparsers.add_parser("g", help="Generate missing orders for all pairs of generators and clusterers")
+    generate.add_argument("n", type=int, help="Number of seeds generated for each pair generator and clusterer", default=3)
     generate.set_defaults(gen = True)
     
-    calculate = subparsers.add_parser("c")
+    calculate = subparsers.add_parser("c", help="Perform calculations based on a file of orders")
+    calculate.add_argument("-i", action = "store_true", help="Use iterative clusterers")
+    calculate.add_argument("fname", type=str, help="filename containing the oders")
+    calculate.add_argument("n", type=int, help="Linenumber of the order to be measured")
     calculate.set_defaults(gen = False)
-    calculate.add_argument("-i", action = "store_true")
-    calculate.add_argument("fname", type=str)
-    calculate.add_argument("n", type=int)
     
     args = parser.parse_args()
     
     if args.gen:
-        generateOrders("orders_false.txt", 3, False)
-        generateOrders("orders_true.txt", 3, True)
+        generateOrders("orders_false.txt", args.n, False)
+        generateOrders("orders_true.txt", args.n, True)
     else:
         measure(args.fname, args.n, args.i)
         

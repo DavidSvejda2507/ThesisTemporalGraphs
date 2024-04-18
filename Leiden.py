@@ -12,15 +12,16 @@ _comm = "leiden_commLeiden"
 _refine = "leiden_commLeidenRefinement"
 _refineIndex = "leiden_refinementIndex"
 _queued = "leiden_queued"
+_wellconnected = "leiden_wellconnected"
 _multiplicity = "leiden_multiplicity"
 _degree = "leiden_degree"
 _selfEdges = "leiden_selfEdges"
 _m = "leiden_m"
 
-theta = 0.01
+theta = 1e-2
 
 
-def leiden(graph, attr, iterations):
+def leiden(graph, attr, iterations, simplified = False):
     initialiseGraph(graph)
     communities = initialisePartition(graph, _comm)
 
@@ -29,7 +30,7 @@ def leiden(graph, attr, iterations):
         communities = cleanCommunities(communities)
 
         refine_communities = initialisePartition(graph, _refine)
-        converged = refine(graph, communities, refine_communities)
+        converged = refine(graph, communities, refine_communities, simplified)
         refine_communities = cleanCommunities(refine_communities)
 
         graphs = [graph]
@@ -41,7 +42,7 @@ def leiden(graph, attr, iterations):
             localMove(graph, communities)
             communities = cleanCommunities(communities)
 
-            converged = refine(graph, communities, refine_communities)
+            converged = refine(graph, communities, refine_communities, simplified)
             refine_communities = cleanCommunities(refine_communities)
 
         for graph, aggregate_graph in zip(graphs[-2::-1], graphs[:0:-1]):
@@ -54,6 +55,8 @@ def leiden(graph, attr, iterations):
     del graph.vs[_refine]
     del graph.vs[_refineIndex]
     del graph.vs[_queued]
+    if not simplified:
+        del graph.vs[_wellconnected]
     del graph.vs[_degree]
     del graph.vs[_selfEdges]
     del graph[_m]
@@ -108,9 +111,9 @@ def initialisePartition(graph, attribute):
     communities = {}
     for index, vertex in enumerate(graph.vs):
         vertex[attribute] = index
-        communities[index] = (vertex[_multiplicity], 0, vertex[_degree])
+        communities[index] = (vertex[_multiplicity], 0, vertex[_degree], True)
     # Moving to community -1 corresponds to moving to a new community
-    communities[-1] = (0, 0, 0)
+    communities[-1] = (0, 0, 0, True)
     return communities
 
 
@@ -136,7 +139,7 @@ def cleanCommunities(communities):
                 raise ValueError(
                     f"Community with {val[1]} internal edges and {val[2]} internal degree without internal vertices found"
                 )
-    output[-1] = (0, 0, 0)  # Empty community
+    output[-1] = (0, 0, 0, True)  # Empty community
     return output
 
 
@@ -215,7 +218,7 @@ def localMove(graph, communities):
             if max_comm == -1:
                 i = 0
                 while True:
-                    if communities.get(i, (0, 0, 0))[0] == 0:
+                    if communities.get(i, (0, 0, 0, True))[0] == 0:
                         break  # find a community that is empty or not included in the dictionary
                     i += 1
                 max_comm = i
@@ -242,13 +245,14 @@ def localMove(graph, communities):
         graph.vs[vertex_id][_queued] = False
 
 
-def refine(graph, communities, refine_communities):
+def refine(graph, communities, refine_communities, simplified):
     """Perform the local move step of the leiden algorithm
 
     Args:
         graph (ig.Graph): Graph to work on
         communities (dict): Dictionary of summaries of the communities
         refine_communities (dict): Dictionary of summaries of the refinement communities
+        simplifief (bool): If true disable the wellconnected check and the randomness in choosing the target community
 
     Returns:
         bool: Whether the refinement step has converged
@@ -262,13 +266,30 @@ def refine(graph, communities, refine_communities):
         # Make a list of all of the vertices in community comm
         kwarg = {_comm + "_eq": comm}
         indices = [v.index for v in graph.vs.select(**kwarg)]
+        degreesum = communities[comm][2]
         random.shuffle(indices)
         # ic(indices)
 
+        if not simplified:
+            # Check which vertices are wellconnected
+            for vertex_id in indices:
+                neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+                degree = graph.vs[vertex_id][_degree]
+                edges = 0
+                for neighbor in neighbors:
+                    edges += graph[vertex_id, neighbor.index]
+                wellconnected = edges >= degree*(degreesum-degree)/(graph[_m]*2)
+                graph.vs[vertex_id][_wellconnected] = wellconnected
+                a, b, c, _ = refine_communities[graph.vs[vertex_id][_refine]]
+                refine_communities[graph.vs[vertex_id][_refine]] = (a, b, c, wellconnected)
+            
         # We don't need to make a queue becuase we only consider vertices that have not yet been merged
         for vertex_id in indices:
             if not graph.vs[vertex_id][_queued]:
                 continue
+            if (not simplified) and (not graph.vs[vertex_id][_wellconnected]):
+                continue
+            
             neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
             # We only consider neighbors in the same community
             degree = graph.vs[vertex_id][_degree]
@@ -279,6 +300,8 @@ def refine(graph, communities, refine_communities):
             neighbor = {}
             for vertex in neighbors:
                 refine_comm = vertex[_refine]
+                if (not simplified) and (not refine_communities[refine_comm][3]):
+                    continue
                 community_edges[refine_comm] = (
                     community_edges.get(refine_comm, self_edges)
                     + graph[vertex_id, vertex.index]
@@ -287,7 +310,6 @@ def refine(graph, communities, refine_communities):
                 # The neighbor dict only stores the last neighbor in the list,
                 # but that's fine because if there are multiple neigbors in the same community
                 # they should all be unqueued already anyway
-            # ic(community_edges)
 
             candidates = []
             weights = []
@@ -314,12 +336,13 @@ def refine(graph, communities, refine_communities):
                 if dq > 0:
                     candidates.append(refine_comm)
                     weights.append(exp(dq / theta))
-            # ic(candidates)
-            # ic(weights)
-            # input()
 
             if len(candidates) > 0:
-                target = random.choices(candidates, weights)[0]
+                if simplified:
+                    max_ = max(weights)
+                    target = candidates[weights.index(max_)]
+                else:
+                    target = random.choices(candidates, weights)[0]
 
                 graph.vs[vertex_id][_refine] = target
                 update_communities(
@@ -335,6 +358,20 @@ def refine(graph, communities, refine_communities):
                 neighbor[target][_queued] = False
                 graph.vs[vertex_id][_queued] = False
                 converged = False
+                
+                # # Check if the new community is wellconnected
+                if not simplified:
+                    kwarg2 = {_refine + "_eq": target}
+                    members = [v.index for v in graph.vs[indices].select(**kwarg2)]
+                    edges = 0
+                    for member in members:
+                        neighbors = graph.vs[graph.neighbors(member)].select(**kwarg)
+                        for neighbor in neighbors:
+                            edges += graph[vertex_id, neighbor.index]
+                    ref_mult, ref_edges, ref_degreesum, _ = refine_communities[target]
+                    if not (edges-2*ref_edges) >= ref_degreesum*(degreesum-ref_degreesum)/(graph[_m]*2):
+                        refine_communities[target] = (ref_mult, ref_edges, ref_degreesum, False)
+                
         # ic(graph.vs[_refine])
         # input()
     return converged
@@ -354,17 +391,19 @@ def update_communities(
         self_edges (double): Total weight of the edges within the vertex being moved
         degree (double): Total degree of the vertices represented by the vertex being moved
     """
-    old_vertexcount, old_edgecount, old_degreesum = communities[current]
+    old_vertexcount, old_edgecount, old_degreesum, _ = communities[current]
     communities[current] = (
         old_vertexcount - multiplicity,
         old_edgecount - community_edges.get(current, self_edges),
         old_degreesum - degree,
+        True,
     )
-    old_vertexcount, old_edgecount, old_degreesum = communities.get(future, (0, 0, 0))
+    old_vertexcount, old_edgecount, old_degreesum, _ = communities.get(future, (0, 0, 0, True))
     communities[future] = (
         old_vertexcount + multiplicity,
         old_edgecount + community_edges.get(future, self_edges),
         old_degreesum + degree,
+        True,
     )
 
 
@@ -389,7 +428,7 @@ def calculateDQPlus(graph, communities, comm, vertex, edges, degree):
     Returns:
         double: Change in modularity
     """
-    vertexcount, edgecount, degreesum = communities[comm]
+    _, _, degreesum, _ = communities[comm]
     dq = edges / graph[_m] - (2 * degreesum * degree) / (2 * graph[_m]) ** 2
     return dq
 
@@ -408,7 +447,7 @@ def calculateDQMinus(graph, communities, comm, vertex, edges, degree):
     Returns:
         double: Change in modularity
     """
-    vertexcount, edgecount, degreesum = communities[comm]
+    _, _, degreesum, _ = communities[comm]
     dq = -edges / graph[_m] + (2 * (degreesum - degree) * degree) / (2 * graph[_m]) ** 2
     return dq
 

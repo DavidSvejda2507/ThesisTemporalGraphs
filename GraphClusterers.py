@@ -4,8 +4,6 @@ import numba
 import GraphAnalysis as grAn
 import LeidenConsistency as LeiCons
 import LeidenConsistency2 as LeiCons2
-import LeidenConsistency3 as LeiCons3
-import LeidenConsistency4 as LeiCons4
 
 
 def clusterStacked(graphs, k, iterations = 2):
@@ -144,7 +142,7 @@ def consistencyLeiden2(graphs, k, iterations = 2, initialisation = None):
     return [graph.vs["comm"] for graph in graphs]
 
 def consistencyLeiden3(graphs, k, iterations = 2):
-    LeiCons3.leiden(graphs, "comm", iterations, k)
+    LeiCons.leiden(graphs, "comm", iterations, k, refinement_consistency_refference="comm")
     
     return [graph.vs["comm"] for graph in graphs]
 
@@ -152,11 +150,11 @@ def initialisedConsistencyLeiden3(graphs, k, iterations = 2):
     membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
     for graph in graphs:
         graph.vs["init"] = membership
-    LeiCons3.leiden(graphs, "comm", iterations, k, "init")
+    LeiCons.leiden(graphs, "comm", iterations, k, "init", refinement_consistency_refference="comm")
 
     return [graph.vs["comm"] for graph in graphs]
 
 def consistencyLeiden4(graphs, k, iterations = 2, initialisation = None):
-    LeiCons4.leiden(graphs, "comm", iterations, k, initialisation)
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
     
     return [graph.vs["comm"] for graph in graphs]

@@ -10,26 +10,26 @@ import GraphAnalysis as GrAn
 import matplotlib.pyplot as plt
 
 # fmt: off
-def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True):
-    alg = LeidenClass(graphs, consistency_weight)
+def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True, refinement_consistency_refference = "refine"):
+    alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference)
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
-        alg.localMove(alg._comm)\
+        alg.localMove()\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
-            .refine(alg._comm, alg._refine)\
+            .refine()\
             .cleanCommunities(alg._refine)
         while not alg.converged:
             alg.aggregate()\
-                .localMove(alg._comm)\
+                .localMove()\
                 .cleanCommunities(alg._comm)\
-                .refine(alg._comm, alg._refine)\
+                .refine()\
                 .cleanCommunities(alg._refine)
         alg.deAggregate()
     # fmt: on
     for graph in graphs:
         graph.vs[attr] = graph.vs[alg._comm]
-        for name in [alg._comm, alg._refine, alg._refineIndex, alg._queued, alg._multiplicity, alg._degree, alg._selfEdges]:
+        for name in [alg._comm, alg._refine, alg._refineIndex, alg._wellConnected, alg._queued, alg._multiplicity, alg._degree, alg._selfEdges]:
             if attr!=name:
                 del graph.vs[name]
         del graph[alg._m]
@@ -46,6 +46,7 @@ class LeidenClass:
     _comm = "leiden_commLeiden"
     _refine = "leiden_commLeidenRefinement"
     _refineIndex = "leiden_refinementIndex"
+    _wellConnected = "leiden_wellConnected"
     _queued = "leiden_queued"
     _multiplicity = "leiden_multiplicity"
     _degree = "leiden_degree"
@@ -56,11 +57,13 @@ class LeidenClass:
     communities = {}
     converged = False
 
-    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01):
+    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01, refinement_consistency_refference = "refine"):
         self.graph_stack = [graphs]
         self.gamma = gamma
         self.theta = theta
         self.consistency_weight = consistency_weight
+        self._refineConsistency = {"comm":self._comm, "refine":self._refine}.get(refinement_consistency_refference)
+        
 
     def initialiseGraph(self, initialisation):
         for graph in self.graph_stack[0]:
@@ -90,13 +93,13 @@ class LeidenClass:
     def initialisePartition(self, attr):
         communities = {}
         i = 0
-        for graph in self.graph_stack[-1]:
+        for index, graph in enumerate(self.graph_stack[-1]):
             for vertex in graph.vs:
                 vertex[attr] = i
                 communities[i] = (vertex[self._multiplicity],
-                                  0, vertex[self._degree])
+                                  0, vertex[self._degree], index, True)
                 i += 1
-        communities[-1] = (0, 0, 0)
+        communities[-1] = (0, 0, 0, -1, True)
         self.communities[attr] = communities
         return self
     
@@ -108,8 +111,8 @@ class LeidenClass:
                 old = communities.get(v[comm], (0,0,0))
                 neighbors = graph.vs[graph.neighbors(v.index)].select(**{self._comm + "_eq": v[comm]})
                 weight = sum(graph[v, neighbor] for neighbor in neighbors)
-                communities[v[comm]] = (old[0]+1, old[1]+weight, old[2] + v[self._degree])
-        communities[-1] = (0,0,0)
+                communities[v[comm]] = (old[0]+1, old[1]+weight, old[2] + v[self._degree], i, True)
+        communities[-1] = (0 ,0 ,0 ,-1, True)
         self.communities[comm] = communities
                 
         
@@ -125,13 +128,12 @@ class LeidenClass:
                     raise ValueError(
                         f"Community with {val[1]} internal edges and {val[2]} internal degree without internal vertices found"
                     )
-        output[-1] = (0, 0, 0)
+        output[-1] = (0, 0, 0, -1, True)
         self.communities[attr] = output
         return self
 
-    def localMove(self, attr):
+    def localMove(self):
         graphs = self.graph_stack[-1]
-        communities = self.communities[attr]
         queue = SimpleQueue()
         length = 0
         for graph in graphs:
@@ -150,13 +152,14 @@ class LeidenClass:
 
         while not queue.empty():
             graph_id, vertex_id = queue.get()
+            # ic(graph_id)
             graph = graphs[graph_id]
             degree = graph.vs[vertex_id][self._degree]
             current_comm = graph.vs[vertex_id][self._comm]
             self_edges = graph.vs[vertex_id][self._selfEdges]
             neighbors = graph.neighbors(vertex_id)
 
-            community_edges = {-1: 0}
+            community_edges = {}
             for vertex in neighbors:
                 comm = graph.vs[vertex][self._comm]
                 community_edges[comm] = (
@@ -166,20 +169,23 @@ class LeidenClass:
             max_dq = [0]
             max_comm = current_comm
             cost_of_leaving = self.calculateDQMinus(
-                attr,
+                self._comm,
+                self._comm,
                 current_comm,
-                graph_id,
                 vertex_id,
                 community_edges.get(current_comm, 0),
                 degree,
             )
+            if sum(cost_of_leaving) > 0:
+                max_dq = cost_of_leaving
+                max_comm = -1
             for comm in community_edges:
                 if comm != current_comm:
                     dq = (
                         self.calculateDQPlus(
-                            attr,
+                            self._comm,
+                            self._comm,
                             comm,
-                            graph_id,
                             vertex_id,
                             community_edges[comm],
                             degree,
@@ -193,15 +199,15 @@ class LeidenClass:
             if max_comm != current_comm:
                 if max_comm == -1:
                     i = 0
-                    communities = self.communities[attr]
+                    communities = self.communities[self._comm]
                     while True:
-                        if communities.get(i, (0, 0, 0))[0] == 0:
+                        if communities.get(i, (0, 0, 0, -1, True))[0] == 0:
                             break
                         i += 1
                     max_comm = i
-                graph.vs[vertex_id][attr] = max_comm
+                graph.vs[vertex_id][self._comm] = max_comm
                 self.update_communities(
-                    attr,
+                    self._comm,
                     current_comm,
                     max_comm,
                     community_edges,
@@ -213,7 +219,7 @@ class LeidenClass:
                 for vertex in neighbors:
                     if (
                         not graph.vs[vertex][self._queued]
-                        and graph.vs[vertex][attr] != max_comm
+                        and graph.vs[vertex][self._comm] != max_comm
                     ):
                         graph.vs[vertex][self._queued] = True
                         queue.put((graph_id, vertex))
@@ -221,100 +227,135 @@ class LeidenClass:
             graph.vs[vertex_id][self._queued] = False
         return self
 
-    def refine(self, attr, refine_attr):
+    def refine(self):
         self.converged = True
         graphs = self.graph_stack[-1]
-        communities = self.communities[attr]
-        for graph_id, graph in enumerate(graphs):
+        for graph in graphs:
             graph.vs[self._queued] = True
-            for comm in communities:
-                kwarg = {self._comm + "_eq": comm}
-                indices = [v.index for v in graph.vs.select(**kwarg)]
-                random.shuffle(indices)
+        communities = list(self.communities[self._comm].keys())
+        refine_communities = self.communities[self._refine]
+        random.shuffle(communities)
+        for comm in communities:
+            _, _, degreesum, graph_id, _ = self.communities[self._comm][comm]
+            graph = graphs[graph_id]
+            kwarg = {self._comm + "_eq": comm}
+            indices = [v.index for v in graph.vs.select(**kwarg)]
+            random.shuffle(indices)
+            
+            # Check which vertices are wellconnected
+            for vertex_id in indices:
+                neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+                degree = graph.vs[vertex_id][self._degree]
+                edges = 0
+                for neighbor in neighbors:
+                    edges += graph[vertex_id, neighbor.index]
+                wellconnected = edges >= degree*(degreesum-degree)/(graph[self._m]*2)
+                graph.vs[vertex_id][self._wellConnected] = wellconnected
+                a, b, c, d, _ = refine_communities[graph.vs[vertex_id][self._refine]]
+                refine_communities[graph.vs[vertex_id][self._refine]] = (a, b, c, d, wellconnected)
+            
+            for vertex_id in indices:
+                if not graph.vs[vertex_id][self._queued]:
+                    continue
+                if not graph.vs[vertex_id][self._wellConnected]:
+                    continue
+                neighbors = graph.vs[graph.neighbors(
+                    vertex_id)].select(**kwarg)
+                degree = graph.vs[vertex_id][self._degree]
+                current_comm = graph.vs[vertex_id][self._refine]
+                self_edges = graph.vs[vertex_id][self._selfEdges]
 
-                for vertex_id in indices:
-                    if not graph.vs[vertex_id][self._queued]:
+                community_edges = {}
+                neighbor = {}
+                for vertex in neighbors:
+                    refine_comm = vertex[self._refine]
+                    if not refine_communities[refine_comm][4]:
                         continue
-                    neighbors = graph.vs[graph.neighbors(
-                        vertex_id)].select(**kwarg)
-                    degree = graph.vs[vertex_id][self._degree]
-                    current_comm = graph.vs[vertex_id][self._refine]
-                    self_edges = graph.vs[vertex_id][self._selfEdges]
-
-                    community_edges = {}
-                    neighbor = {}
-                    for vertex in neighbors:
-                        refine_comm = vertex[self._refine]
-                        community_edges[refine_comm] = (
-                            community_edges.get(refine_comm, 0)
-                            + graph[vertex_id, vertex.index]
-                        )
-                        neighbor[refine_comm] = vertex
-
-                    candidates = []
-                    weights = []
-                    cost_of_leaving = self.calculateDQMinus(
-                        refine_attr,
-                        current_comm,
-                        graph_id,
-                        vertex_id,
-                        0,
-                        degree,
+                    community_edges[refine_comm] = (
+                        community_edges.get(refine_comm, 0)
+                        + graph[vertex_id, vertex.index]
                     )
-                    for refine_comm in community_edges:
-                        dq = (
-                            self.calculateDQPlus(
-                                refine_attr,
-                                refine_comm,
-                                graph_id,
-                                vertex_id,
-                                community_edges[refine_comm],
-                                degree,
-                            )
-                            + cost_of_leaving
-                        )
-                        if sum(dq) > 0:
-                            candidates.append((refine_comm, dq))
-                            weights.append(exp(sum(dq) / self.theta))
+                    neighbor[refine_comm] = vertex
 
-                    if len(candidates) > 0:
-                        target, dq = random.choices(candidates, weights)[0]
-
-                        graph.vs[vertex_id][refine_attr] = target
-                        self.update_communities(
-                            refine_attr,
-                            current_comm,
-                            target,
-                            community_edges,
-                            graph.vs[vertex_id][self._multiplicity],
-                            self_edges,
+                candidates = []
+                weights = []
+                cost_of_leaving = self.calculateDQMinus(
+                    self._refine,
+                    self._refineConsistency,
+                    current_comm,
+                    vertex_id,
+                    0,
+                    degree,
+                )
+                for refine_comm in community_edges:
+                    dq = (
+                        self.calculateDQPlus(
+                            self._refine,
+                            self._refineConsistency,
+                            refine_comm,
+                            vertex_id,
+                            community_edges[refine_comm],
                             degree,
                         )
+                        + cost_of_leaving
+                    )
+                    if sum(dq) > 0:
+                        candidates.append((refine_comm, dq))
+                        weights.append(exp(sum(dq) / self.theta))
 
-                        neighbor[target][self._queued] = False
-                        graph.vs[vertex_id][self._queued] = False
-                        self.converged = False
+                if len(candidates) > 0:
+                    target, dq = random.choices(candidates, weights)[0]
+
+                    graph.vs[vertex_id][self._refine] = target
+                    self.update_communities(
+                        self._refine,
+                        current_comm,
+                        target,
+                        community_edges,
+                        graph.vs[vertex_id][self._multiplicity],
+                        self_edges,
+                        degree,
+                    )
+
+                    neighbor[target][self._queued] = False
+                    graph.vs[vertex_id][self._queued] = False
+                    self.converged = False
+                    
+                    kwarg2 = {self._refine + "_eq": target}
+                    members = [v.index for v in graph.vs[indices].select(**kwarg2)]
+                    edges = 0
+                    for member in members:
+                        neighbors = graph.vs[graph.neighbors(member)].select(**kwarg)
+                        for neighbor in neighbors:
+                            edges += graph[vertex_id, neighbor.index]
+                    ref_mult, ref_edges, ref_degreesum, graph_id, _ = refine_communities[target]
+                    if not (edges-2*ref_edges) >= ref_degreesum*(degreesum-ref_degreesum)/(graph[self._m]*2):
+                        refine_communities[target] = (ref_mult, ref_edges, ref_degreesum, graph_id, False)
         return self
 
     def update_communities(self, attr, current, future, community_edges, multiplicity, self_edges, degree):
         communities = self.communities[attr]
-        old_vertexcount, old_edgecount, old_degreesum = communities[current]
+        old_vertexcount, old_edgecount, old_degreesum, graph_id, _ = communities[current]
         communities[current] = (
             old_vertexcount - multiplicity,
             old_edgecount - (community_edges.get(current, 0) + self_edges),
             old_degreesum - degree,
+            graph_id,
+            True,
         )
-        old_vertexcount, old_edgecount, old_degreesum = communities.get(
-            future, (0, 0, 0)
+        old_vertexcount, old_edgecount, old_degreesum, graph_id, _ = communities.get(
+            future, (0, 0, 0, graph_id, True)
         )
         communities[future] = (
             old_vertexcount + multiplicity,
             old_edgecount + (community_edges.get(future, 0) + self_edges),
             old_degreesum + degree,
+            graph_id,
+            True,
         )
 
-    def calculateDQPlus(self, attr, comm, graph_id, vertex_id, edges, degree):
-        vertexcount, edgecount, degreesum = self.communities[attr][comm]
+    def calculateDQPlus(self, attr, attr_consistency, comm, vertex_id, edges, degree):
+        _, _, degreesum, graph_id, _ = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
             edges / graph[self._m]
@@ -344,10 +385,10 @@ class LeidenClass:
 
             graph = self.graph_stack[-1][_graph_id]
             for v in _vertex:
-                val = graph.vs[v][attr]
+                val = graph.vs[v][attr_consistency]
                 vertex_comm[val] = vertex_comm.get(val, 0) + 1
             for v in _comm_members:
-                val = graph.vs[v][attr]
+                val = graph.vs[v][attr_consistency]
                 adj_comm[val] = adj_comm.get(val, 0) + 1
                 
             for key in vertex_comm:
@@ -359,8 +400,8 @@ class LeidenClass:
 
         return (dq, self.consistency_weight * dc)
 
-    def calculateDQMinus(self, attr, comm, graph_id, vertex_id, edges, degree):
-        vertexcount, edgecount, degreesum = self.communities[attr][comm]
+    def calculateDQMinus(self, attr, attr_consistency, comm, vertex_id, edges, degree):
+        _, _, degreesum, graph_id, _ = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
         dq = (
             -edges / graph[self._m]
@@ -391,10 +432,10 @@ class LeidenClass:
 
             graph = self.graph_stack[-1][_graph_id]
             for v in _vertex:
-                val = graph.vs[v][attr]
+                val = graph.vs[v][attr_consistency]
                 vertex_comm[val] = vertex_comm.get(val, 0) + 1
             for v in _comm_members:
-                val = graph.vs[v][attr]
+                val = graph.vs[v][attr_consistency]
                 adj_comm[val] = adj_comm.get(val, 0) + 1
 
             for key in vertex_comm:
