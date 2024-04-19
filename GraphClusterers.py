@@ -123,16 +123,18 @@ def clusterVariance2(graphs, k, iterations = 2):
 
     return partitions
 
-def consistencyLeiden(graphs, k, iterations = 2):
-    LeiCons.leiden(graphs, "comm", iterations, k)
+def consistencyLeiden(graphs, k, iterations = 2, initialisation = None):
+    LeiCons.leiden(graphs, "comm", iterations, k, initialisation)
     
     return [graph.vs["comm"] for graph in graphs]
 
-def initialisedConsistencyLeiden(graphs, k, iterations = 2):
-    membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
-    for graph in graphs:
-        graph.vs["init"] = membership
-    LeiCons.leiden(graphs, "comm", iterations, k, "init")
+def initialisedConsistencyLeiden(graphs, k, iterations = 2, initialisation = None):
+    if initialisation is None:
+        membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
+        for graph in graphs:
+            graph.vs["init"] = membership
+        initialisation = "init"
+    LeiCons.leiden(graphs, "comm", iterations, k, initialisation)
 
     return [graph.vs["comm"] for graph in graphs]
 
@@ -141,16 +143,18 @@ def consistencyLeiden2(graphs, k, iterations = 2, initialisation = None):
     
     return [graph.vs["comm"] for graph in graphs]
 
-def consistencyLeiden3(graphs, k, iterations = 2):
-    LeiCons.leiden(graphs, "comm", iterations, k, refinement_consistency_refference="comm")
+def consistencyLeiden3(graphs, k, iterations = 2, initialisation = None):
+    LeiCons.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
     
     return [graph.vs["comm"] for graph in graphs]
 
-def initialisedConsistencyLeiden3(graphs, k, iterations = 2):
-    membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
-    for graph in graphs:
-        graph.vs["init"] = membership
-    LeiCons.leiden(graphs, "comm", iterations, k, "init", refinement_consistency_refference="comm")
+def initialisedConsistencyLeiden3(graphs, k, iterations = 2, initialisation = None):
+    if initialisation is None:
+        membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
+        for graph in graphs:
+            graph.vs["init"] = membership
+        initialisation = "init"
+    LeiCons.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
 
     return [graph.vs["comm"] for graph in graphs]
 

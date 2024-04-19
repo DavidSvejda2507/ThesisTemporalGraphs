@@ -7,6 +7,7 @@ import GraphAnalysis as grAn
 import GraphClusterers as grCls
 import DataStorage as DS
 from math import exp
+import warnings
 
 
 GenerationPars = [
@@ -82,41 +83,41 @@ clusterers = [
         "filename": "Connected",
         "iterations": 5
     },
+]
+initialisable_clusterers = [
     {
         "method": grCls.consistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden partition",
         "filename": "Consistency1-0",
-        "iterations": 5
+        "iterations": 8
     },
     {
         "method": grCls.initialisedConsistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Initialised consistency Leiden partition",
         "filename": "Consistency1-1",
-        "iterations": 5
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden2,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 2 partition",
+        "filename": "Consistency2-0",
+        "iterations": 8
     },
     {
         "method": grCls.consistencyLeiden3,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden 3 partition",
         "filename": "Consistency3-0",
-        "iterations": 5
+        "iterations": 8
     },
     {
         "method": grCls.initialisedConsistencyLeiden3,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Initialised consistency Leiden 3 partition",
         "filename": "Consistency3-1",
-        "iterations": 5
-    },
-]
-initialisable_clusterers = [
-    {
-        "method": grCls.consistencyLeiden2,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 2 partition",
-        "filename": "Consistency2-0",
         "iterations": 8
     },
     {
@@ -209,6 +210,8 @@ if __name__ == "__main__":
     calculate.set_defaults(gen = False)
     
     args = parser.parse_args()
+    
+    warnings.simplefilter("ignore", UserWarning, 55)
     
     if args.gen:
         generateOrders("orders_false.txt", args.n, False)
