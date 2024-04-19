@@ -20,6 +20,7 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
             .refine()\
             .cleanCommunities(alg._refine)
         while not alg.converged:
+            ic("aggregate")
             alg.aggregate()\
                 .localMove()\
                 .cleanCommunities(alg._comm)\
@@ -158,6 +159,7 @@ class LeidenClass:
             current_comm = graph.vs[vertex_id][self._comm]
             self_edges = graph.vs[vertex_id][self._selfEdges]
             neighbors = graph.neighbors(vertex_id)
+            assert(self.communities[self._comm][current_comm][3] == graph_id)
 
             community_edges = {}
             for vertex in neighbors:
@@ -181,17 +183,22 @@ class LeidenClass:
                 max_comm = -1
             for comm in community_edges:
                 if comm != current_comm:
-                    dq = (
-                        self.calculateDQPlus(
-                            self._comm,
-                            self._comm,
-                            comm,
-                            vertex_id,
-                            community_edges[comm],
-                            degree,
+                    try:
+                        dq = (
+                            self.calculateDQPlus(
+                                self._comm,
+                                self._comm,
+                                comm,
+                                vertex_id,
+                                community_edges[comm],
+                                degree,
+                                graph_id
+                            )
+                            + cost_of_leaving
                         )
-                        + cost_of_leaving
-                    )
+                    except AssertionError as err:
+                        print("test")
+                        raise err
                     if sum(dq) > sum(max_dq):
                         max_dq = dq
                         max_comm = comm
@@ -202,6 +209,7 @@ class LeidenClass:
                     communities = self.communities[self._comm]
                     while True:
                         if communities.get(i, (0, 0, 0, -1, True))[0] == 0:
+                            communities.pop(i, None)
                             break
                         i += 1
                     max_comm = i
@@ -233,6 +241,7 @@ class LeidenClass:
         for graph in graphs:
             graph.vs[self._queued] = True
         communities = list(self.communities[self._comm].keys())
+        communities = communities.copy()
         refine_communities = self.communities[self._refine]
         random.shuffle(communities)
         for comm in communities:
@@ -296,6 +305,7 @@ class LeidenClass:
                             vertex_id,
                             community_edges[refine_comm],
                             degree,
+                            graph_id
                         )
                         + cost_of_leaving
                     )
@@ -354,9 +364,11 @@ class LeidenClass:
             True,
         )
 
-    def calculateDQPlus(self, attr, attr_consistency, comm, vertex_id, edges, degree):
+    def calculateDQPlus(self, attr, attr_consistency, comm, vertex_id, edges, degree, _graph_id):
         _, _, degreesum, graph_id, _ = self.communities[attr][comm]
         graph = self.graph_stack[-1][graph_id]
+        assert graph_id == _graph_id, f"{graph_id=}, {_graph_id=}"
+        
         dq = (
             edges / graph[self._m]
             - (2 * degreesum * degree) / (2 * graph[self._m]) ** 2
@@ -560,14 +572,15 @@ if __name__ == "__main__":
     # print(g2.vs[_degree])
 
     # ic.disable()
-    for i in range(1):
+    for i in range(10):
         # graph = ig.Graph.Famous("Cubical")
         # graph = ig.Graph.Famous("zachary")
+        ic(i)
         random.seed(i)
         graphs = [GrGen.GirvanNewmanBenchmark(
             7, 4 * i, density=0.8) for i in range(5)]
         random.seed(i)
-        print(leiden(graphs, "comm", 2, 0.8))
+        print(leiden(graphs, "comm", 2, 0.8, refinement_consistency_refference="comm"))
         # ic(graph.vs["comm"])
         cluster = ig.VertexClustering.FromAttribute(graphs[0], "comm")
         ig.plot(cluster, "test.pdf")

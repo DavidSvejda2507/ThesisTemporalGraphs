@@ -466,6 +466,7 @@ class LeidenClass:
                 i = 0
                 while True:
                     if communities.get(i, (0, 0, 0, -1, True))[0] == 0:
+                        communities.pop(i, None)
                         break
                     i += 1
                 target_comm = i
