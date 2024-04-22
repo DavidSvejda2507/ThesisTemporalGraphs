@@ -416,14 +416,12 @@ class LeidenClass:
         final_option = namedtuple("final_option", ["source_target", "target_comms", "dQ"])
         final_options = []
         option = namedtuple("option", ["target", "graph", "source_target", "target_comms", "dQ"])
-        options = []
         
         for comm in local_options:
             dq = sum(local_options[comm][0::2])
             dc = sum(local_options[comm][1::2])
             if dq>0 or dc>0:
                 final_options.append(final_option(comm, {graph_id:comm}, sum(local_options[comm])))
-                options.append(option(comm, graph_id, comm, {graph_id:comm}, sum(local_options[comm])))
         if len(final_options) == 0:
             return
             
@@ -431,6 +429,7 @@ class LeidenClass:
             previous_comms = base_comms
             previous_graph_id = graph_id
             vertex_id = selected_vertices[graph_id]
+            options = [option(opt.source_target, graph_id, opt.source_target, opt.target_comms, opt.dQ) for opt in final_options]
             for current_graph_id in range(graph_id+direction, limit, direction):
                 
                 # Find the options and modularities for moves
