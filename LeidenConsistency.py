@@ -20,7 +20,6 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
             .refine()\
             .cleanCommunities(alg._refine)
         while not alg.converged:
-            ic("aggregate")
             alg.aggregate()\
                 .localMove()\
                 .cleanCommunities(alg._comm)\
