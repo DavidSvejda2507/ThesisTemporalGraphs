@@ -114,14 +114,14 @@ initialisable_clusterers = [
     },
     {
         "method": grCls.initialisedConsistencyLeiden,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
         "label": "Initialised consistency Leiden a",
         "filename": "Consistency1-1",
         "iterations": 8
     },
     {
         "method": grCls.initialisedConsistencyLeiden3,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
         "label": "Initialised consistency Leiden b",
         "filename": "Consistency3-1",
         "iterations": 8
@@ -138,6 +138,20 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden 2b",
         "filename": "Consistency4-0",
+        "iterations": 8
+    },
+    {
+        "method": grCls.initialisedConsistencyLeiden2,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Initialised consistency Leiden a",
+        "filename": "Consistency1-1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.initialisedConsistencyLeiden4,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Initialised consistency Leiden b",
+        "filename": "Consistency3-1",
         "iterations": 8
     },
 ]

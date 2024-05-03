@@ -143,6 +143,16 @@ def consistencyLeiden2(graphs, k, iterations = 2, initialisation = None):
     
     return [graph.vs["comm"] for graph in graphs]
 
+def initialisedConsistencyLeiden2(graphs, k, iterations = 2, initialisation = None):
+    if initialisation is None:
+        membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
+        for graph in graphs:
+            graph.vs["init"] = membership
+        initialisation = "init"
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation)
+
+    return [graph.vs["comm"] for graph in graphs]
+
 def consistencyLeiden3(graphs, k, iterations = 2, initialisation = None):
     LeiCons.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
     
@@ -161,4 +171,14 @@ def initialisedConsistencyLeiden3(graphs, k, iterations = 2, initialisation = No
 def consistencyLeiden4(graphs, k, iterations = 2, initialisation = None):
     LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
     
+    return [graph.vs["comm"] for graph in graphs]
+
+def initialisedConsistencyLeiden4(graphs, k, iterations = 2, initialisation = None):
+    if initialisation is None:
+        membership = leidenalg.find_partition_multiplex(graphs, leidenalg.ModularityVertexPartition)[0]
+        for graph in graphs:
+            graph.vs["init"] = membership
+        initialisation = "init"
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
+
     return [graph.vs["comm"] for graph in graphs]
