@@ -95,9 +95,12 @@ def loadClusteringMethod(clusterer, generationpars):
             modularities.append(mod_sum/n)
             consistencies.append(consistency_sum/n)
         else:
-            warnings.warn(f"""Failed to find entry with k = {k} in {filename} with n_graphs = {generationpars['n_steps']} and
-step_size = {generationpars['step_size']} and k_gen = {generationpars['k_out']} and 
-density = {generationpars['density']} and iterations = {clusterer['iterations']}""")
+            warnings.warn(f"Failed to find entry with k = {k} in {filename} with n_graphs = {generationpars['n_steps']} and "
+                            f"step_size = {generationpars['step_size']} and k_gen = {generationpars['k_out']} and "
+                            f"density = {generationpars['density']} and iterations = {clusterer['iterations']}")
+            
+    # No interpolation
+    return modularities, consistencies
             
     # Interpolating between the different sollutions
     previous = None
@@ -132,9 +135,10 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterati
     # Plotting
     fig, ax = plt.subplots(1, 1)
     for clusterer in clusterers:
-        clusterer["iterations"] =  iterations
+        # clusterer["iterations"] =  iterations
         mods, consists = loadClusteringMethod(clusterer, GenerationPars)
-        ax.plot(consists, mods, "o-", label=clusterer["label"], markevery = 2)
+        ax.plot(consists, mods, "o-", label=clusterer["label"])
+        # ax.plot(consists, mods, "o-", label=clusterer["label"], markevery = 2)
     ax.plot(
         consistency,
         modularity,
@@ -148,6 +152,7 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterati
     ax.legend()
     ax.set_title(title)
     fig.savefig(filename)
+    plt.close()
     
 if __name__ == "__main__":
     # import GraphGenerators as GrGen
