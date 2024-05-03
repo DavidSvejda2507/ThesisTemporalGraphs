@@ -195,6 +195,7 @@ def measure(filename, line, initialisable = True):
             
 
 def generateOrders(filename, seeds, initialisable = False):
+    count = 0
     with open(filename, "w") as file:
         for gen_par in GenerationPars:
             if initialisable: cluster_list = initialisable_clusterers
@@ -214,11 +215,51 @@ def generateOrders(filename, seeds, initialisable = False):
                             mask3 = [x["iterations"] == i for x in data[mask1][mask2]]
                             if not any(mask3):
                                 file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i}\n")
+                                count += 1
                         else:
                             for i in range(clusterer["iterations"]):
                                 mask3 = [x["iterations"] == i+1 for x in data[mask1][mask2]]
                                 if not any(mask3):
                                     file.write(F"{gen_par['filename']}, {clusterer['filename']}, {gen_par['n_steps']}, {gen_par['step_size']}, {gen_par['k_out']}, {gen_par['density']}, {s}, {k}, {i+1}\n")
+                                    count += 1
+    return count
+
+def makeSbatch(initialisable, count):
+    if initialisable:
+        with open("measure2.sbatch", "w") as file:
+            file.write(f"""#!/bin/bash
+
+#SBATCH --job-name="order_true"
+#SBATCH --array=0-{count}
+#SBATCH --partition=defq
+#SBATCH --time=0-12:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --output=%j-%x-stdout.txt
+#SBATCH --error=%j-%x-stderr.txt
+
+python3 GraphMeasuring.py c -i orders_true.txt $SLURM_ARRAY_TASK_ID
+
+exit 0
+""")
+    else:
+        with open("measure1.sbatch", "w") as file:
+            file.write(f"""#!/bin/bash
+
+#SBATCH --job-name="order_false"
+#SBATCH --array=0-{count}
+#SBATCH --partition=defq
+#SBATCH --time=0-02:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=1
+#SBATCH --output=%j-%x-stdout.txt
+#SBATCH --error=%j-%x-stderr.txt
+
+python3 GraphMeasuring.py c orders_false.txt $SLURM_ARRAY_TASK_ID
+
+exit 0""")
                                            
     
 if __name__ == "__main__":
@@ -241,8 +282,10 @@ if __name__ == "__main__":
     warnings.simplefilter("ignore", UserWarning, 55)
     
     if args.gen:
-        generateOrders("orders_false.txt", args.n, False)
-        generateOrders("orders_true.txt", args.n, True)
+        count = generateOrders("orders_false.txt", args.n, False)
+        makeSbatch(False, count)
+        count = generateOrders("orders_true.txt", args.n, True)
+        makeSbatch(True, count)
     else:
         measure(args.fname, args.n, args.i)
         
