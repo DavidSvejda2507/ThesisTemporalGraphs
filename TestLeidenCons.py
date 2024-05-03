@@ -1,5 +1,6 @@
 import igraph as ig
 import LeidenConsistency
+import LeidenConsistency2
 import leidenalg
 import GraphGenerators as GrGen
 
@@ -7,10 +8,16 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+import argparse as ap
+
+parser = ap.ArgumentParser()
+parser.add_argument("n_runs", type=int, help="The number of runs of all algorithms")
+args = parser.parse_args()
+
 n_bins = 15
-n = 100
+n = args.n_runs
 n_iterations = 2
-x = [[None] * n for i in range(2)]
+x = [[None] * n for i in range(3)]
 
 for i in range(n):
     if i % 10 == 0:
@@ -21,7 +28,9 @@ for i in range(n):
     # G = ig.Graph.Famous("Zachary")
     # title = "Histogram of modularities on Zachary's karate klub"
     random.seed(i)
-    x[1][i] = LeidenConsistency.leiden([G], "comm", n_iterations)[0]
+    x[1][i] = LeidenConsistency.leiden([G], "comm", n_iterations,0)
+    random.seed(i)
+    x[2][i] = LeidenConsistency2.leiden([G], "comm", n_iterations,0)
     # if x[1][i] < 0.38:
     #     print(i)
     random.seed(i)
@@ -31,8 +40,8 @@ for i in range(n):
 
 fig, ax = plt.subplots(nrows=1, ncols=1)
 
-colors = ["red", "lime"]
-labels = ["leidenalg", "python implementation"]
+colors = ["red", "lime", "blue"]
+labels = ["leidenalg", "consistency Leiden 1", "consistency Leiden 2"]
 ax.hist(x, n_bins, histtype="bar", color=colors, label=labels)
 ax.legend(prop={"size": 10})
 ax.set_title(title)

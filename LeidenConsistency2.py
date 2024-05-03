@@ -489,6 +489,7 @@ class LeidenClass:
                     graph.vs[vertex][self._queued] = True
                     if not graph.vs[vertex][self._inQueue]:
                         queue.put((graph_id, vertex))
+                        graph.vs[vertex][self._inQueue] = True
 
             graph.vs[vertex_id][self._queued] = False
        

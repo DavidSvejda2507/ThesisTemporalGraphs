@@ -37,43 +37,56 @@ GenerationPars = [
     },
 ]
 clusterers = [
-    {
-        "method": grCls.clusterVariance,
-        "ks": [1, 2, 3, 4, 5, 6, 7, 8],
-        "label": "Variance of optimal solutions",
-        "filename": "Variance1",
-        "iterations": 2
-    },
-    {
-        "method": grCls.clusterVariance2,
-        "ks": [1, 2, 3, 4, 5],
-        "label": "Variance of optimal solutions with depth 2",
-        "filename": "Variance2",
-        "iterations": 2
-    },
-    {
-        "method": grCls.clusterStacked,
-        "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
-        "label": "Merge-partition",
-        "filename": "Stacked",
-        "iterations": 3
-    },
+    # {
+    #     "method": grCls.clusterVariance,
+    #     "ks": [1, 2, 3, 4, 5, 6, 7, 8],
+    #     "label": "Variance of optimal solutions",
+    #     "filename": "Variance1",
+    #     "iterations": 2
+    # },
+    # {
+    #     "method": grCls.clusterVariance2,
+    #     "ks": [1, 2, 3, 4, 5],
+    #     "label": "Variance of optimal solutions with depth 2",
+    #     "filename": "Variance2",
+    #     "iterations": 2
+    # },
+    # {
+    #     "method": grCls.clusterStacked,
+    #     "ks": [1, 2, 3, 4, 6, 8, 12, 16, 32],
+    #     "label": "Merge-partition",
+    #     "filename": "Stacked",
+    #     "iterations": 3
+    # },
     {
         "method": grCls.clusterConnected,
         "ks": [
             0.1,
+            0.075,
             0.05,
+            0.035,
             0.02,
+            0.015,
             0.01,
+            0.0085,
             0.007,
+            0.006,
             0.005,
+            0.0045,
             0.004,
+            0.0035,
             0.003,
+            0.00275,
             0.0025,
+            0.00225,
             0.002,
+            0.00175,
             0.0015,
+            0.00125,
             0.001,
+            0.00085,
             0.0007,
+            0.0005,
             0.0005,
             0.0002,
             0.0001,
@@ -88,42 +101,42 @@ initialisable_clusterers = [
     {
         "method": grCls.consistencyLeiden,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden partition",
+        "label": "Consistency Leiden a",
         "filename": "Consistency1-0",
-        "iterations": 8
-    },
-    {
-        "method": grCls.initialisedConsistencyLeiden,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Initialised consistency Leiden partition",
-        "filename": "Consistency1-1",
-        "iterations": 8
-    },
-    {
-        "method": grCls.consistencyLeiden2,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 2 partition",
-        "filename": "Consistency2-0",
         "iterations": 8
     },
     {
         "method": grCls.consistencyLeiden3,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 3 partition",
+        "label": "Consistency Leiden b",
         "filename": "Consistency3-0",
+        "iterations": 8
+    },
+    {
+        "method": grCls.initialisedConsistencyLeiden,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Initialised consistency Leiden a",
+        "filename": "Consistency1-1",
         "iterations": 8
     },
     {
         "method": grCls.initialisedConsistencyLeiden3,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Initialised consistency Leiden 3 partition",
+        "label": "Initialised consistency Leiden b",
         "filename": "Consistency3-1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden2,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 2a",
+        "filename": "Consistency2-0",
         "iterations": 8
     },
     {
         "method": grCls.consistencyLeiden4,
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 4 partition",
+        "label": "Consistency Leiden 2b",
         "filename": "Consistency4-0",
         "iterations": 8
     },

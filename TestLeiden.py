@@ -10,7 +10,7 @@ import random
 import argparse as ap
 
 parser = ap.ArgumentParser()
-parser.add_argument("n_runs", type=int, help="The number of runs of both algorithms")
+parser.add_argument("n_runs", type=int, help="The number of runs of all algorithms")
 args = parser.parse_args()
 
 n_bins = 15
