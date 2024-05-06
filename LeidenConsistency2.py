@@ -532,7 +532,7 @@ class LeidenClass:
                     continue
                 if self.refineVertex(graph, vertex_id, graph_id, kwarg):
                     
-                    target = graph.vs[vertex_id[self._refine]]
+                    target = graph.vs[vertex_id][self._refine]
                     kwarg2 = {self._refine + "_eq": target}
                     members = [v.index for v in graph.vs[indices].select(**kwarg2)]
                     edges = 0
