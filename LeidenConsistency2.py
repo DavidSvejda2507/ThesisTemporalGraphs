@@ -530,7 +530,19 @@ class LeidenClass:
                     continue
                 if not graph.vs[vertex_id][self._wellConnected]:
                     continue
-                self.refineVertex(graph, vertex_id, graph_id, kwarg)
+                if self.refineVertex(graph, vertex_id, graph_id, kwarg):
+                    
+                    target = graph.vs[vertex_id[self._refine]]
+                    kwarg2 = {self._refine + "_eq": target}
+                    members = [v.index for v in graph.vs[indices].select(**kwarg2)]
+                    edges = 0
+                    for member in members:
+                        neighbors = graph.vs[graph.neighbors(member)].select(**kwarg)
+                        for neighbor in neighbors:
+                            edges += graph[vertex_id, neighbor.index]
+                    ref_mult, ref_edges, ref_degreesum, graph_id, _ = refine_communities[target]
+                    if not (edges-2*ref_edges) >= ref_degreesum*(degreesum-ref_degreesum)/(graph[self._m]*2):
+                        refine_communities[target] = (ref_mult, ref_edges, ref_degreesum, graph_id, False)
         return self
     
     def refineVertex(self, graph, vertex_id, graph_id, kwarg):
@@ -546,11 +558,14 @@ class LeidenClass:
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._refine]
         self_edges = graph.vs[vertex_id][self._selfEdges]
+        refine_communities = self.communities[self._refine]
 
         community_edges = {}
         neighbor = {}
         for vertex in neighbors:
             refine_comm = vertex[self._refine]
+            if not refine_communities[refine_comm][4]:
+                continue
             community_edges[refine_comm] = (
                 community_edges.get(refine_comm, 0)
                 + graph[vertex_id, vertex.index]
@@ -598,6 +613,8 @@ class LeidenClass:
             neighbor[target][self._queued] = False
             graph.vs[vertex_id][self._queued] = False
             self.converged = False
+            return True
+        return False
 
     def update_communities(self, attr, current, future, community_edges, multiplicity, self_edges, degree):
         """Update the community dictionary to reflect the changes caused by a move.
