@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #SBATCH --job-name="order_false"
-#SBATCH --array=0-540
+#SBATCH --array=0-4
 #SBATCH --partition=defq
-#SBATCH --time=0-02:00:00
+#SBATCH --time=0-06:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
