@@ -11,7 +11,7 @@ import GraphAnalysis as GrAn
 import matplotlib.pyplot as plt
 
 # fmt: off
-def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True, refinement_consistency_refference = "refine"):
+def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True, refinement_consistency_refference = "refine", extend = False):
     """Performs the second version of the consistency leiden algorithm.
 
     Args:
@@ -26,7 +26,7 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
     Returns:
         float: Quality of the found communities.
     """    
-    alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference)
+    alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference, extend=extend)
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
         alg.localMove()\
@@ -73,7 +73,7 @@ class LeidenClass:
     communities = {}
     converged = False
 
-    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01, refinement_consistency_refference = "refine"):
+    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01, refinement_consistency_refference = "refine", extend = False):
         """Make a LeidenClass object of use in the consistency leiden algorithm 2.
 
         Args:
@@ -89,6 +89,7 @@ class LeidenClass:
         self.consistency_weight = consistency_weight
         self.counter = 0
         self._refineConsistency = {"comm":self._comm, "refine":self._refine}.get(refinement_consistency_refference)
+        self.search_extended = extend
 
     def initialiseGraph(self, initialisation=None):
         """Prepares the graphs by storing info in attributes.
@@ -377,7 +378,7 @@ class LeidenClass:
                     dQ = inter_opt.dQ + sum(local_options[local_opt]) + interactions[inter_opt.target][local_opt]
                     dq = sum(local_options[local_opt][0::2])
                     dc = sum(local_options[local_opt][1::2]) + interactions[inter_opt.target][local_opt]
-                    if (dq>0 or dc>0) and dQ > max_dQ:
+                    if (dq>0 or dc>0 or self.search_extended) and dQ > max_dQ:
                         max_dQ = dQ
                         best_intermediate = inter_opt
                 if best_intermediate is not None:

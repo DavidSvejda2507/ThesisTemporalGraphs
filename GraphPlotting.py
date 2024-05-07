@@ -114,7 +114,7 @@ def loadClusteringMethod(clusterer, generationpars):
         previous = (modularity, consistency)
     return mods, consists
     
-def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterations=2):
+def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize = (6,3.5)):
     # Generating the graphs
     graphs = grGen.generateGraphSequence(**GenerationPars, seed_offset=seed)
     # Refference point
@@ -133,7 +133,8 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, iterati
     print(f"Refference modularity: {modularity}")
 
     # Plotting
-    fig, ax = plt.subplots(1, 1)
+    fig, ax = plt.subplots(1, 1, figsize = figsize)
+    fig.set_tight_layout(True)
     for clusterer in clusterers:
         # clusterer["iterations"] =  iterations
         mods, consists = loadClusteringMethod(clusterer, GenerationPars)
@@ -160,7 +161,9 @@ if __name__ == "__main__":
     # PlotGraphseries(graphs, "community")
     # input("Press return to end\n")
     
-    import GraphMeasuring as GrMeas
-    for gen_pars in GrMeas.GenerationPars:
-        title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
-        PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, f"test_{gen_pars['filename']}.pdf")
+    # import GraphMeasuring as GrMeas
+    # for gen_pars in GrMeas.GenerationPars:
+    #     title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps"
+    #     PlotTestResults(gen_pars, GrMeas.plottable_clusterers, title, f"test_{gen_pars['filename']}.pdf")
+    
+    warnings.warn("Use Plot.py to generate plots")

@@ -43,5 +43,5 @@ if args.plotType == "consistency":
             
         title = f"{gen_pars['filename']} with {gen_pars['n_steps']*gen_pars['step_size']/32} turns in {gen_pars['n_steps']} steps\nComparing the different consistency Leiden algorithms"
         print(f"{clusterer['filename']}")
-        GrPlot.PlotTestResults(gen_pars, clusterers, title, f"Plots/consistency/consistency_{gen_pars['filename']}.pdf")
+        GrPlot.PlotTestResults(gen_pars, clusterers, title, f"Plots/consistency/consistency_{gen_pars['filename']}.pdf", figsize=(6,3.5))
     

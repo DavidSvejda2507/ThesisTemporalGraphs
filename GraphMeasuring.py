@@ -92,8 +92,8 @@ clusterers = [
             0.0001,
             0,
         ],
-        "label": "Connected-partition",
-        "filename": "Connected",
+        "label": "Temporal Leiden",
+        "filename": "TemporalLeiden",
         "iterations": 5
     },
 ]
@@ -152,6 +152,20 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/6) for i in range(-20, 12)],
         "label": "Initialised consistency Leiden b",
         "filename": "Consistency4-1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden5,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 2c",
+        "filename": "Consistency2-2",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden6,
+        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+        "label": "Consistency Leiden 2d",
+        "filename": "Consistency2-3",
         "iterations": 8
     },
 ]

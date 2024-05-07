@@ -182,3 +182,13 @@ def initialisedConsistencyLeiden4(graphs, k, iterations = 2, initialisation = No
     LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm")
 
     return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden5(graphs, k, iterations = 2, initialisation = None):
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, extend = True)
+    
+    return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden6(graphs, k, iterations = 2, initialisation = None):
+    LeiCons2.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="comm", extend = True)
+    
+    return [graph.vs["comm"] for graph in graphs]
