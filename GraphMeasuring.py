@@ -244,7 +244,7 @@ def makeSbatch(initialisable, count):
             file.write(f"""#!/bin/bash
 
 #SBATCH --job-name="order_true"
-#SBATCH --array=0-{count}
+#SBATCH --array=0-{count-1}
 #SBATCH --partition=defq
 #SBATCH --time=0-12:00:00
 #SBATCH --nodes=1
@@ -262,7 +262,7 @@ exit 0
             file.write(f"""#!/bin/bash
 
 #SBATCH --job-name="order_false"
-#SBATCH --array=0-{count}
+#SBATCH --array=0-{count-1}
 #SBATCH --partition=defq
 #SBATCH --time=0-02:00:00
 #SBATCH --nodes=1
