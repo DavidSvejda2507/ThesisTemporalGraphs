@@ -103,7 +103,7 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden a",
         "filename": "Consistency1-0",
-        "iterations": 8
+        "iterations": 100
     },
     {
         "method": grCls.consistencyLeiden3,
