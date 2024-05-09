@@ -94,7 +94,7 @@ clusterers = [
         ],
         "label": "Temporal Leiden",
         "filename": "TemporalLeiden",
-        "iterations": 5
+        "iterations": 8
     },
 ]
 initialisable_clusterers = [
