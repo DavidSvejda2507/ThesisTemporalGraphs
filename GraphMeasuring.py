@@ -103,7 +103,8 @@ initialisable_clusterers = [
         "ks": [0]+[exp(i/3) for i in range(-10, 6)],
         "label": "Consistency Leiden a",
         "filename": "Consistency1-0",
-        "iterations": 100
+        "iterations": 8
+        # "iterations": 100 # Calculations upto 100 were performed on the synthetic datasets, but did not significantly improve results
     },
     {
         "method": grCls.consistencyLeiden3,
@@ -143,31 +144,31 @@ initialisable_clusterers = [
     {
         "method": grCls.initialisedConsistencyLeiden2,
         "ks": [0]+[exp(i/6) for i in range(-20, 12)],
-        "label": "Initialised consistency Leiden a",
+        "label": "Initialised consistency Leiden 2a",
         "filename": "Consistency2-1",
         "iterations": 8
     },
     {
         "method": grCls.initialisedConsistencyLeiden4,
         "ks": [0]+[exp(i/6) for i in range(-20, 12)],
-        "label": "Initialised consistency Leiden b",
+        "label": "Initialised consistency Leiden 2b",
         "filename": "Consistency4-1",
         "iterations": 8
     },
-    {
-        "method": grCls.consistencyLeiden5,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 2c",
-        "filename": "Consistency2-2",
-        "iterations": 8
-    },
-    {
-        "method": grCls.consistencyLeiden6,
-        "ks": [0]+[exp(i/3) for i in range(-10, 6)],
-        "label": "Consistency Leiden 2d",
-        "filename": "Consistency2-3",
-        "iterations": 8
-    },
+    # {
+    #     "method": grCls.consistencyLeiden5,
+    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+    #     "label": "Consistency Leiden 2c",
+    #     "filename": "Consistency2-2",
+    #     "iterations": 8
+    # },
+    # {
+    #     "method": grCls.consistencyLeiden6,
+    #     "ks": [0]+[exp(i/3) for i in range(-10, 6)],
+    #     "label": "Consistency Leiden 2d",
+    #     "filename": "Consistency2-3",
+    #     "iterations": 8
+    # },
 ]
 plottable_clusterers = clusterers + initialisable_clusterers
 

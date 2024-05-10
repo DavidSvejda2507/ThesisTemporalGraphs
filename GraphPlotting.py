@@ -114,7 +114,7 @@ def loadClusteringMethod(clusterer, generationpars):
         previous = (modularity, consistency)
     return mods, consists
     
-def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize = (6,3.5)):
+def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize = (6,3.5), style = "o-"):
     # Generating the graphs
     graphs = grGen.generateGraphSequence(**GenerationPars, seed_offset=seed)
     # Refference point
@@ -138,7 +138,7 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize
     for clusterer in clusterers:
         # clusterer["iterations"] =  iterations
         mods, consists = loadClusteringMethod(clusterer, GenerationPars)
-        ax.plot(consists, mods, "o-", label=clusterer["label"])
+        ax.plot(consists, mods, style, label=clusterer["label"])
         # ax.plot(consists, mods, "o-", label=clusterer["label"], markevery = 2)
     ax.plot(
         consistency,
