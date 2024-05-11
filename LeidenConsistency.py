@@ -133,6 +133,7 @@ class LeidenClass:
         return self
 
     def localMove(self):
+        count = 0
         graphs = self.graph_stack[-1]
         queue = SimpleQueue()
         length = 0
@@ -149,10 +150,14 @@ class LeidenClass:
             queue.put(i)
         for graph in graphs:
             graph.vs[self._queued] = True
-
+        ic.disable()
         while not queue.empty():
             graph_id, vertex_id = queue.get()
-            # ic(graph_id)
+            # if vertex_id == 54:
+            #     print(f"...........54..........")
+            #     print(graph.vs[vertex_id][self._queued])
+                
+                
             graph = graphs[graph_id]
             degree = graph.vs[vertex_id][self._degree]
             current_comm = graph.vs[vertex_id][self._comm]
@@ -212,6 +217,11 @@ class LeidenClass:
                             break
                         i += 1
                     max_comm = i
+                    
+                count += 1
+                ic(f"{count}  vertex {vertex_id} from {graph.vs[vertex_id][self._comm]} to {max_comm}")
+                ic(f"maxQ {sum(max_dq)}")
+                    
                 graph.vs[vertex_id][self._comm] = max_comm
                 self.update_communities(
                     self._comm,
@@ -224,14 +234,22 @@ class LeidenClass:
                 )
 
                 for vertex in neighbors:
+                    # if count == 116:
+                    #     print(vertex)
+                    #     print(graph.vs[vertex][self._queued])
+                    #     print(graph.vs[vertex][self._comm])
+                        
                     if (
                         not graph.vs[vertex][self._queued]
                         and graph.vs[vertex][self._comm] != max_comm
                     ):
                         graph.vs[vertex][self._queued] = True
                         queue.put((graph_id, vertex))
+                        ic(f"Add {vertex}")
 
+                # input()
             graph.vs[vertex_id][self._queued] = False
+        ic.enable()
         return self
 
     def refine(self):
@@ -240,15 +258,18 @@ class LeidenClass:
         for graph in graphs:
             graph.vs[self._queued] = True
         communities = list(self.communities[self._comm].keys())
-        communities = communities.copy()
         refine_communities = self.communities[self._refine]
         random.shuffle(communities)
+        ic(communities)
+        
+        count = 0
         for comm in communities:
             _, _, degreesum, graph_id, _ = self.communities[self._comm][comm]
             graph = graphs[graph_id]
             kwarg = {self._comm + "_eq": comm}
             indices = [v.index for v in graph.vs.select(**kwarg)]
             random.shuffle(indices)
+            ic(indices)
             
             # Check which vertices are wellconnected
             for vertex_id in indices:
@@ -314,6 +335,11 @@ class LeidenClass:
 
                 if len(candidates) > 0:
                     target, dq = random.choices(candidates, weights)[0]
+                    
+                    count += 1
+                    ic(f"{count}  vertex {vertex_id} from {graph.vs[vertex_id][self._comm]} to {target}")
+                    ic(f"maxQ {dq}")
+                    input()
 
                     graph.vs[vertex_id][self._refine] = target
                     self.update_communities(

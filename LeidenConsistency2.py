@@ -405,6 +405,7 @@ class LeidenClass:
         graph.vs[vertex_id][self._inQueue] = False
         if not graph.vs[vertex_id][self._queued]:
             return
+        graph.vs[vertex_id][self._queued] = False
         
         consistency_normalisation_factor = 2/(graph[self._n]*(graph[self._n]-1))
         selected_vertices = {graph_id: vertex_id}
@@ -453,7 +454,6 @@ class LeidenClass:
                 
         final_option = max(final_options, key = lambda x:x.dQ)
         if final_option.dQ <= 0:
-            graphs[graph_id].vs[selected_vertices[graph_id]][self._queued] = False
             return
             
         communities = self.communities[self._comm]
