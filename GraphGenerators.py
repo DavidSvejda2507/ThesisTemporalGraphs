@@ -154,6 +154,9 @@ def concatGraphs(graphs, weight):
     return G
 
 
+def EUCore(offset, **kwargs):
+    return ig.load(f"RealGraphs/Graph_{offset}", "pickle")
+
 def generateGraphSequence(seed_offset, n_steps, step_size, generator, filename=None, **kwargs):
     graphs = [None] * n_steps
     for i in range(n_steps):

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name="order_false"
-#SBATCH --array=0--1
+#SBATCH --array=0-719
 #SBATCH --partition=defq
 #SBATCH --time=0-02:00:00
 #SBATCH --nodes=1

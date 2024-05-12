@@ -35,6 +35,14 @@ GenerationPars = [
         "k_out": 7,
         "density": 0.5,
     },
+    {
+        "n_steps": 48,
+        "generator": grGen.EUCore,
+        "filename": "EUCore",
+        "step_size": 1,
+        "k_out": 7, # k_out and density are not used in the generation
+        "density": 0.5, # But are needed for the order system
+    },
 ]
 clusterers = [
     # {
