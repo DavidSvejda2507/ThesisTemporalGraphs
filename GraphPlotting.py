@@ -121,16 +121,19 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize
     mod_sum = 0
     consistency_sum = 0
     n_steps = GenerationPars["n_steps"]
-    for i in range(n_steps):
-        partition = graphs[i].vs["community"]
-        modularity = graphs[i].modularity(partition)
-        mod_sum += modularity
-        if i > 0:
-            consistency_sum += grAn.Consistency(partition, previous_part)
-        previous_part = partition
-    modularity = mod_sum / n_steps
-    consistency = consistency_sum / (n_steps - 1)
-    print(f"Refference modularity: {modularity}")
+    ref = False
+    if "community" in graphs[0].vs[0].attributes().keys():
+        ref = True
+        for i in range(n_steps):
+            partition = graphs[i].vs["community"]
+            modularity = graphs[i].modularity(partition)
+            mod_sum += modularity
+            if i > 0:
+                consistency_sum += grAn.Consistency(partition, previous_part)
+            previous_part = partition
+        modularity = mod_sum / n_steps
+        consistency = consistency_sum / (n_steps - 1)
+        print(f"Refference modularity: {modularity}")
 
     # Plotting
     fig, ax = plt.subplots(1, 1, figsize = figsize)
@@ -140,12 +143,13 @@ def PlotTestResults(GenerationPars, clusterers, title, filename, seed=0, figsize
         mods, consists = loadClusteringMethod(clusterer, GenerationPars)
         ax.plot(consists, mods, style, label=clusterer["label"])
         # ax.plot(consists, mods, "o-", label=clusterer["label"], markevery = 2)
-    ax.plot(
-        consistency,
-        modularity,
-        "ro",
-        label="'True' community structure",
-    )
+    if ref: 
+        ax.plot(
+            consistency,
+            modularity,
+            "ro",
+            label="'True' community structure",
+        )
     # ax.set_ylim(bottom=0, top=ax.get_ylim()[1] * 1.1)
     # ax.set_xlim(left=0, right=ax.get_xlim()[1] * 1.1)
     ax.set_ylabel("Average modularity")

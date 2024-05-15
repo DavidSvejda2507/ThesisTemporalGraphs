@@ -20,7 +20,7 @@ for method in methods:
 # colors = ["red", "lime", "blue"]
 labels = np.array([methods[i] for i in range(5)])
 mask1 = [True, True, True, False, False]
-mask2 = [True, False, False, True, True]
+mask2 = [False, True, False, True, True]
 
 
 for mask, filename in [(mask1,"Leiden_comp.pdf"), (mask2,"Leiden_comp_const.pdf")]:
