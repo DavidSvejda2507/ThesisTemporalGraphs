@@ -35,14 +35,14 @@ GenerationPars = [
         "k_out": 7,
         "density": 0.5,
     },
-    {
-        "n_steps": 48,
-        "generator": grGen.EUCore,
-        "filename": "EUCore",
-        "step_size": 1,
-        "k_out": 7, # k_out and density are not used in the generation
-        "density": 0.5, # But are needed for the order system
-    },
+    # {
+    #     "n_steps": 48,
+    #     "generator": grGen.EUCore,
+    #     "filename": "EUCore",
+    #     "step_size": 1,
+    #     "k_out": 7, # k_out and density are not used in the generation
+    #     "density": 0.5, # But are needed for the order system
+    # },
 ]
 clusterers = [
     # {
@@ -177,6 +177,20 @@ initialisable_clusterers = [
     #     "filename": "Consistency2-3",
     #     "iterations": 8
     # },
+    {
+        "method": grCls.consistencyLeiden3_0,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Initialised consistency Leiden 3a",
+        "filename": "FullConsistency3_0",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden3_1,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Initialised consistency Leiden 3b",
+        "filename": "FullConsistency3_1",
+        "iterations": 8
+    },
 ]
 plottable_clusterers = clusterers + initialisable_clusterers
 
