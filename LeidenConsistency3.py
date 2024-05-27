@@ -29,21 +29,21 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
     alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference)
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
-        ic("a")
+        
         alg.localMove()\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
             .refine()\
             .cleanCommunities(alg._refine)
-        ic("b")
+        
         while not alg.converged:
-            ic("c")
+        
             alg.aggregate()\
                 .localMove()\
                 .cleanCommunities(alg._comm)\
                 .refine()\
                 .cleanCommunities(alg._refine)
-            ic("d")
+        
         alg.deAggregate()
     # fmt: on
     for graph in graphs:
@@ -455,7 +455,7 @@ class LeidenClass:
         if final_option.dQ <= 0:
             return
             
-        ic("moving")
+        
         communities = self.communities[self._comm]
         for graph_id, graph in enumerate(graphs):
             vertex_id = selected_vertices[graph_id]

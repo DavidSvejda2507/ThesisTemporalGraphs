@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="order_true"
 #SBATCH --array=0-593
-#SBATCH --partition=defq
+#SBATCH --partition=slowq
 #SBATCH --time=0-12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
