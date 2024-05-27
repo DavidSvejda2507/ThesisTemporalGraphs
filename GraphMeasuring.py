@@ -180,15 +180,43 @@ initialisable_clusterers = [
     {
         "method": grCls.consistencyLeiden3_0,
         "ks": [0]+[exp(i/6) for i in range(-20, 12)],
-        "label": "Initialised consistency Leiden 3a",
+        "label": "Full consistency Leiden 1a",
         "filename": "FullConsistency3_0",
         "iterations": 8
     },
     {
         "method": grCls.consistencyLeiden3_1,
         "ks": [0]+[exp(i/6) for i in range(-20, 12)],
-        "label": "Initialised consistency Leiden 3b",
+        "label": "Full consistency Leiden 1b",
         "filename": "FullConsistency3_1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden3_0_1,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Full consistency Leiden 2a",
+        "filename": "FullConsistency3_0_1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden3_1_1,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Full consistency Leiden 2b",
+        "filename": "FullConsistency3_1_1",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden3_0_2,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Full consistency Leiden 3a",
+        "filename": "FullConsistency3_0_2",
+        "iterations": 8
+    },
+    {
+        "method": grCls.consistencyLeiden3_1_2,
+        "ks": [0]+[exp(i/6) for i in range(-20, 12)],
+        "label": "Full consistency Leiden 3b",
+        "filename": "FullConsistency3_1_2",
         "iterations": 8
     },
 ]

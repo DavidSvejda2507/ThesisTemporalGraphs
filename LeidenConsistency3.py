@@ -11,7 +11,7 @@ import GraphAnalysis as GrAn
 import matplotlib.pyplot as plt
 
 # fmt: off
-def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True, refinement_consistency_refference = "comm"):
+def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, sanitise = True, refinement_consistency_refference = "comm", neighbours = "nearest"):
     """Performs the second version of the consistency leiden algorithm.
 
     Args:
@@ -22,28 +22,31 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
         initialisation (string, optional): Name of vertex attribute that stores the initial communities. Defaults to None.
         sanitise (bool, optional): Whether to renumber the output communities to 0 ... k. Defaults to True.
         refinement_consistency_refference ("refine" or "comm", optional): Which community structure to use when calculating the consistency during the refinement step. Defaults to "comm"
+        neighbours ("nearest" or "adjacent" or "all"): Which vertices to consider when checking neighbouring vertices.
 
     Returns:
         float: Quality of the found communities.
-    """    
-    alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference)
+    """
+    alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference, neighbours = neighbours)
     alg.initialiseGraph(initialisation)
     for _ in range(iterations):
-        
+        ic("start")
+        ic(neighbours)
         alg.localMove()\
             .cleanCommunities(alg._comm)\
             .initialisePartition(alg._refine)\
             .refine()\
             .cleanCommunities(alg._refine)
-        
+        ic("end of first iteration")
         while not alg.converged:
-        
+            ic("start next iteration")
             alg.aggregate()\
                 .localMove()\
                 .cleanCommunities(alg._comm)\
                 .refine()\
                 .cleanCommunities(alg._refine)
-        
+            ic("end of iteration")
+        ic("deaggregate")
         alg.deAggregate()
     # fmt: on
     for graph in graphs:
@@ -77,7 +80,7 @@ class LeidenClass:
     communities = {}
     converged = False
 
-    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01, refinement_consistency_refference = "refine"):
+    def __init__(self, graphs, consistency_weight=0.5, gamma=1, theta=0.01, refinement_consistency_refference = "refine", neighbours = "nearest"):
         """Make a LeidenClass object of use in the consistency leiden algorithm 2.
 
         Args:
@@ -86,6 +89,7 @@ class LeidenClass:
             gamma (float, optional): UNIMPLEMENTED Scale of modularity. Defaults to 1.
             theta (float, optional): Parameter that affects the randomness in the refinement step. Defaults to 0.01.
             refinement_consistency_refference ("refine" or "comm", optional): Which community structure to use when calculating the consistency during the refinement step. Defaults to "refine"
+            neighbours ("nearest" or "adjacent" or "all", optional): Which vertices to consider when checking neighbouring vertices, defaults to nearest.
         """        
         self.graph_stack = [graphs]
         self.gamma = gamma
@@ -93,6 +97,20 @@ class LeidenClass:
         self.consistency_weight = consistency_weight
         self.counter = 0
         self._refineConsistency = {"comm":self._comm, "refine":self._refine}.get(refinement_consistency_refference)
+        self.neighbours = neighbours
+        if neighbours == "nearest":
+            self.neighbour_graph_stack = self.graph_stack
+        elif neighbours == "adjacent":
+            neighbour_graphs = []
+            for i in range(len(graphs)):
+                neighbour_graphs.append(ig.union(graphs[max(0,i-1):min(len(graphs)-1, i+1)], False))
+            self.neighbour_graph_stack = [neighbour_graphs]
+        elif neighbours == "all":
+            neighbour_graph = ig.Graph.Full(n = graphs[0].vcount())
+            self.neighbour_graph_stack = [[neighbour_graph]*len(graphs)]
+        else:
+            raise ValueError(f"Neighbours argument ({neighbours}) was not recognised")
+        
 
     def initialiseGraph(self, initialisation=None):
         """Prepares the graphs by storing info in attributes.
@@ -263,7 +281,8 @@ class LeidenClass:
     
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._comm]
-        neighbors = graph.neighbors(vertex_id)
+        neighbour_graph = self.neighbour_graph_stack[-1][current_graph_id]
+        neighbors = neighbour_graph.neighbors(vertex_id)
         
         community_edges = {-1: 0}
         for vertex in neighbors:
@@ -483,7 +502,8 @@ class LeidenClass:
             )
             graph.vs[vertex_id][self._comm] = target_comm
 
-            for vertex in graph.neighbors(vertex_id):
+            neighbour_graph = self.neighbour_graph_stack[-1][graph_id]
+            for vertex in neighbour_graph.neighbors(vertex_id):
                 if (
                     not graph.vs[vertex][self._queued]
                     and graph.vs[vertex][self._comm] != target_comm
@@ -515,12 +535,15 @@ class LeidenClass:
             
             # Check which vertices are wellconnected
             for vertex_id in indices:
-                neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
-                degree = graph.vs[vertex_id][self._degree]
-                edges = 0
-                for neighbor in neighbors:
-                    edges += graph[vertex_id, neighbor.index]
-                wellconnected = edges >= degree*(degreesum-degree)/(graph[self._m]*2)
+                if self.neighbours == "nearest":
+                    neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+                    degree = graph.vs[vertex_id][self._degree]
+                    edges = 0
+                    for neighbor in neighbors:
+                        edges += graph[vertex_id, neighbor.index]
+                    wellconnected = edges >= degree*(degreesum-degree)/(graph[self._m]*2)
+                else:
+                    wellconnected = True
                 graph.vs[vertex_id][self._wellConnected] = wellconnected
                 a, b, c, d, _ = refine_communities[graph.vs[vertex_id][self._refine]]
                 refine_communities[graph.vs[vertex_id][self._refine]] = (a, b, c, d, wellconnected)
@@ -531,7 +554,8 @@ class LeidenClass:
                 if not graph.vs[vertex_id][self._wellConnected]:
                     continue
                 if self.refineVertex(graph, vertex_id, graph_id, kwarg):
-                    
+                    if not self.neighbours == "nearest":
+                        continue
                     target = graph.vs[vertex_id][self._refine]
                     kwarg2 = {self._refine + "_eq": target}
                     members = [v.index for v in graph.vs[indices].select(**kwarg2)]
@@ -553,8 +577,9 @@ class LeidenClass:
             vertex_id (int): Index of current vertex.
             graph_id (int): Index of current graph.
             kwarg (dict): Dictionary containing the argument for the select function call that selects only members of the same community as the current vertex.
-        """        
-        neighbors = graph.vs[graph.neighbors(vertex_id)].select(**kwarg)
+        """  
+        neighbour_graph = self.neighbour_graph_stack[-1][graph_id]      
+        neighbors = graph.vs[neighbour_graph.neighbors(vertex_id)].select(**kwarg)
         degree = graph.vs[vertex_id][self._degree]
         current_comm = graph.vs[vertex_id][self._refine]
         self_edges = graph.vs[vertex_id][self._selfEdges]
@@ -831,6 +856,24 @@ class LeidenClass:
                 communities[v[self._refine]][1] for v in aggregate_graph.vs
             ]
             new_layer.append(aggregate_graph)
+            
+        if self.neighbours == "nearest":
+            self.neighbour_graph_stack.append(new_layer)
+        elif self.neighbours == "adjacent":
+            neighbor_graphs = []
+            for graph, neighbor_graph in zip(self.graph_stack[-1], self.neighbour_graph_stack[-1]):
+                neighbor_graph.vs[self._refine] = graph.vs[self._refine]
+                partition = ig.VertexClustering.FromAttribute(neighbor_graph, self._refine)
+                aggregate_graph = partition.cluster_graph(None, None)
+                del partition
+                neighbor_graphs.append(aggregate_graph)
+            self.neighbour_graph_stack.append(neighbor_graphs)
+        elif self.neighbours == "all":
+            neighbor_graphs = [ig.Graph.Full(g.vcount()) for g in new_layer]
+            self.neighbour_graph_stack.append(neighbor_graphs)
+        else:
+            raise AttributeError(f"self.neighbours was changed to {self.neighbours} which is not supported")
+        
         self.graph_stack.append(new_layer)
         return self
 
@@ -842,6 +885,7 @@ class LeidenClass:
         """        
         self.deAggregate_Unwind(self._comm)
         self.graph_stack = [self.graph_stack[0]]
+        self.neighbour_graph_stack = [self.neighbour_graph_stack[0]]
         return self
 
     def deAggregate_Unwind(self, attr):

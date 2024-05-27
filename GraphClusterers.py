@@ -203,3 +203,23 @@ def consistencyLeiden3_1(graphs, k, iterations = 2, initialisation = None):
     LeiCons3.leiden(graphs, "comm", iterations, k, initialisation)
     
     return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden3_0_1(graphs, k, iterations = 2, initialisation = None):
+    LeiCons3.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="refine", neighbours="adjacent")
+    
+    return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden3_1_1(graphs, k, iterations = 2, initialisation = None):
+    LeiCons3.leiden(graphs, "comm", iterations, k, initialisation, neighbours="adjacent")
+    
+    return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden3_0_2(graphs, k, iterations = 2, initialisation = None):
+    LeiCons3.leiden(graphs, "comm", iterations, k, initialisation, refinement_consistency_refference="refine", neighbours="all")
+    
+    return [graph.vs["comm"] for graph in graphs]
+
+def consistencyLeiden3_1_2(graphs, k, iterations = 2, initialisation = None):
+    LeiCons3.leiden(graphs, "comm", iterations, k, initialisation, neighbours="all")
+    
+    return [graph.vs["comm"] for graph in graphs]

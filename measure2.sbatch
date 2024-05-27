@@ -1,8 +1,8 @@
 #!/bin/bash
 
 #SBATCH --job-name="order_true"
-#SBATCH --array=0-593
-#SBATCH --partition=slowq
+#SBATCH --array=0-1189
+#SBATCH --partition=defq
 #SBATCH --time=0-12:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
