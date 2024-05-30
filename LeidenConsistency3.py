@@ -29,6 +29,7 @@ def leiden(graphs, attr, iterations, consistency_weight, initialisation = None, 
     """
     alg = LeidenClass(graphs, consistency_weight, refinement_consistency_refference = refinement_consistency_refference, neighbours = neighbours)
     alg.initialiseGraph(initialisation)
+    ic.disable()
     for _ in range(iterations):
         ic("start")
         ic(neighbours)
